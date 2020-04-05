@@ -1,17 +1,17 @@
-from model import unet, unet_Enze19, unet_Enze19_2
-from data import trainGenerator, testGenerator, saveResult, saveResult_Amir
-import keras
-from keras.callbacks import ModelCheckpoint
-from pathlib import Path
-import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
-# matplotlib.use('ps')
-import cv2
+import argparse
 import os
 import time
+from pathlib import Path
+
+# matplotlib.use('ps')
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
+from keras.callbacks import ModelCheckpoint
 from scipy.spatial import distance
-import argparse
+
+from data import trainGenerator
+from model import unet_Enze19_2
 
 #%% Hyper-parameter tuning
 parser = argparse.ArgumentParser(description='Glacier Front Segmentation')

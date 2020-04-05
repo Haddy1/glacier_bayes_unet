@@ -18,7 +18,7 @@ data_count = 0
 data_all = []
 data_names = []
 
-for filename in Path('..\\front_detection\\training-data-zone\\').rglob('*.png'):
+for filename in Path('../front_detection/training-data-zone/').rglob('*.png'):
     data = imageio.imread(filename)
     print(data.shape)
     data_all.append(data)
