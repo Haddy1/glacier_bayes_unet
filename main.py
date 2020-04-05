@@ -40,8 +40,8 @@ PATCH_SIZE = args.Patch_Size
 batch_size = args.Batch_Size 
 
 
-num_samples = len([file for file in Path('data_'+str(PATCH_SIZE)+'train/images/').rglob('*.png')]) # number of training samples
-num_val_samples = len([file for file in Path('data_'+str(PATCH_SIZE)+'val/images/').rglob('*.png')]) # number of validation samples
+num_samples = len([file for file in Path('data_'+str(PATCH_SIZE)+'/train/images/').rglob('*.png')]) # number of training samples
+num_val_samples = len([file for file in Path('data_'+str(PATCH_SIZE)+'/val/images/').rglob('*.png')]) # number of validation samples
 
 Out_Path = Path('data_'+str(PATCH_SIZE)+'/test/masks_predicted_'+time.strftime("%y%m%d-%H%M%S")) # adding the time in the folder name helps to keep the results for multiple back to back exequations of the code
 if not os.path.exists(Path('data/train/aug')): os.makedirs(Path('data/train/aug'))
