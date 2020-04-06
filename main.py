@@ -29,7 +29,9 @@ parser.add_argument('--Patch_Size', default=256, type=int, help='batch size (int
 
 # parser.add_argument('--EARLY_STOPPING', default=1, type=int, help='If 1, classifier is using early stopping based on validation loss with patience 20 (0/1)')
 parser.add_argument("--LOSS", help="loss function for the deep classifiers training ", choices=["binary_crossentropy", "focal_loss"], default="binary_crossentropy")
-parser.add_argument('--Loss_Parms', default=0, type=float, help='dictionary with parameters for loss function')
+#parser.add_argument('--Loss_Parms', type=str, help='dictionary with parameters for loss function')
+parser.add_argument('--alpha', type=str, help='parameter for loss function')
+parser.add_argument('--gamma', type=str, help='parameter for loss function')
 
 parser.add_argument('--OUTPATH', default='output/results/21.09/', type=str, help='Output path for results')
 
@@ -76,9 +78,10 @@ val_Generator = trainGenerator(batch_size = batch_size,
                         save_to_dir = None)
 
 
-if args.Loss_Parms:
-    loss_parms = json.loads(args.Loss_Parms)
-    loss_function = locals()[args.LOSS](**loss_parms)
+if args.alpha and args.gamma:
+    #loss_parms = json.loads(args.Loss_Parms)
+    #loss_function = locals()[args.LOSS](**loss_parms)
+    loss_function = locals()[args.LOSS](alpha=args.alpha, gamma=args.gamma)
 else:
     loss_function = locals()[args.LOSS]()
 
