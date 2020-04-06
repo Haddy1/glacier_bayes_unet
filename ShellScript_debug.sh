@@ -15,5 +15,4 @@
 #  pip3 install --user -r cluster_requirements.txt
 #pip3 install pathlib
 #pip3 install scikit-image
-pip3 list
 python3 main.py
