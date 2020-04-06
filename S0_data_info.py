@@ -72,7 +72,7 @@ train_idx, val_idx = train_test_split(train_idx, test_size=0.2, random_state=1) 
         
 #%% generate patches
 START = time.time()
-PATCH_SIZE = 256 # ERROR: Some images are smaller than 512 and thus will be discarded with PATCH_SIZE=512 (We do not want it!)
+PATCH_SIZE = 512 # ERROR: Some images are smaller than 512 and thus will be discarded with PATCH_SIZE=512 (We do not want it!)
 
 #####
 # train path

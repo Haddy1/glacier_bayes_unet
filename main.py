@@ -2,6 +2,7 @@ import argparse
 import os
 import time
 from pathlib import Path
+import json
 
 # matplotlib.use('ps')
 import cv2
@@ -12,6 +13,8 @@ from scipy.spatial import distance
 
 from data import trainGenerator
 from model import unet_Enze19_2
+from loss_functions import focal_loss
+from keras.losses import *
 
 #%% Hyper-parameter tuning
 parser = argparse.ArgumentParser(description='Glacier Front Segmentation')
@@ -25,7 +28,8 @@ parser.add_argument('--Batch_Size', default=100, type=int, help='batch size (int
 parser.add_argument('--Patch_Size', default=256, type=int, help='batch size (integer value)')
 
 # parser.add_argument('--EARLY_STOPPING', default=1, type=int, help='If 1, classifier is using early stopping based on validation loss with patience 20 (0/1)')
-# parser.add_argument('--LOSS', default='binary_crossentropy', type=str, help='loss function for the deep classifiers training (binary_crossentropy/f1_loss)')
+parser.add_argument("--LOSS", help="loss function for the deep classifiers training ", choices=["binary_crossentropy", "focal_loss"], default="binary_crossentropy")
+parser.add_argument('--Loss_Parms', default=0, type=float, help='dictionary with parameters for loss function')
 
 parser.add_argument('--OUTPATH', default='output/results/21.09/', type=str, help='Output path for results')
 
@@ -71,7 +75,15 @@ val_Generator = trainGenerator(batch_size = batch_size,
                         aug_dict = None, 
                         save_to_dir = None)
 
-model = unet_Enze19_2()
+
+if args.Loss_Parms:
+    loss_parms = json.loads(args.Loss_Parms)
+    loss_function = locals()[args.LOSS](**loss_parms)
+else:
+    loss_function = locals()[args.LOSS]()
+
+
+model = unet_Enze19_2(loss_function=loss_function)
 model_checkpoint = ModelCheckpoint(str(Path(str(Out_Path),'unet_zone.hdf5')), monitor='val_loss', verbose=0, save_best_only=True)
 
 steps_per_epoch = np.ceil(num_samples / batch_size)
