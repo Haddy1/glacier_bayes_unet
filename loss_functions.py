@@ -34,3 +34,15 @@ def dice_loss(y_true, y_pred):
     denominator = K.sum(y_true + y_pred, axis=-1)
 
     return 1 - (numerator + 1) / (denominator + 1)
+
+
+def combined_loss(*loss_functions):
+
+    def loss(y_true, y_pred):
+        combined_result = 0
+        for loss_function in loss_functions:
+            combined_result += loss_function(y_true, y_pred)
+
+        return combined_result
+
+    return loss

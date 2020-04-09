@@ -94,7 +94,7 @@ if args.alpha and args.gamma:
     #loss_function = locals()[args.LOSS](**loss_parms)
     loss_function = locals()[args.LOSS](alpha=args.alpha, gamma=args.gamma)
 else:
-    loss_function = locals()[args.LOSS]()
+    loss_function = locals()[args.LOSS]
 
 
 model = unet_Enze19_2(loss_function=loss_function)

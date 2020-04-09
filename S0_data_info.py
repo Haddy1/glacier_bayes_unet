@@ -67,12 +67,12 @@ for i in range(len(data_names)):
 from sklearn.model_selection import train_test_split
 
 data_idx = np.arange(len(images_names_id))
-train_idx, test_idx = train_test_split(data_idx, test_size=10, random_state=1) # 10 images are chosen as the test images
+train_idx, test_idx = train_test_split(data_idx, test_size=5, train_size=20, random_state=1) # 10 images are chosen as the test images
 train_idx, val_idx = train_test_split(train_idx, test_size=0.2, random_state=1) # 20% of training data as validation data
         
 #%% generate patches
 START = time.time()
-PATCH_SIZE = 512 # ERROR: Some images are smaller than 512 and thus will be discarded with PATCH_SIZE=512 (We do not want it!)
+PATCH_SIZE = 256 # ERROR: Some images are smaller than 512 and thus will be discarded with PATCH_SIZE=512 (We do not want it!)
 
 #####
 # train path
