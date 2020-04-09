@@ -59,6 +59,9 @@ else:
 if not os.path.exists(Path('data/train/aug')): os.makedirs(Path('data/train/aug'))
 if not os.path.exists(Out_Path): os.makedirs(Out_Path)
 
+# log all arguments including default ones
+with open('arguments.txt', 'w') as f:
+    f.write(json.dumps(vars(args)))
 
 
 #data_gen_args = dict(rotation_range=0.2,
@@ -97,11 +100,6 @@ else:
 model = unet_Enze19_2(loss_function=loss_function)
 model_checkpoint = ModelCheckpoint(str(Path(str(Out_Path),'unet_zone.hdf5')), monitor='val_loss', verbose=0, save_best_only=True)
 
-# log all arguments including default ones
-arguments = vars(args)
-arguments["model"] = model.__name__
-with open('arguments.txt', 'w') as f:
-    f.write(json.dumps(arguments))
 
 steps_per_epoch = np.ceil(num_samples / batch_size)
 validation_steps = np.ceil(num_val_samples / batch_size)
