@@ -13,6 +13,7 @@ from scipy.spatial import distance
 
 from data import trainGenerator
 from model import unet_Enze19_2
+import helper_functions
 from loss_functions import focal_loss
 from keras.losses import *
 
@@ -49,9 +50,16 @@ batch_size = args.Batch_Size
 num_samples = len([file for file in Path('data_'+str(PATCH_SIZE)+'/train/images/').rglob('*.png')]) # number of training samples
 num_val_samples = len([file for file in Path('data_'+str(PATCH_SIZE)+'/val/images/').rglob('*.png')]) # number of validation samples
 
-Out_Path = Path('data_'+str(PATCH_SIZE)+'/test/masks_predicted_'+time.strftime("%y%m%d-%H%M%S")) # adding the time in the folder name helps to keep the results for multiple back to back exequations of the code
+if args.OUTPATH:
+    Out_Path = args.OUTPATH
+else:
+    Out_Path = Path('data_'+str(PATCH_SIZE)+'/test/masks_predicted_'+ time.strftime("%y%m%d-%H%M%S"))
+
+
 if not os.path.exists(Path('data/train/aug')): os.makedirs(Path('data/train/aug'))
 if not os.path.exists(Out_Path): os.makedirs(Out_Path)
+
+
 
 #data_gen_args = dict(rotation_range=0.2,
 #                    width_shift_range=0.05,
@@ -88,6 +96,12 @@ else:
 
 model = unet_Enze19_2(loss_function=loss_function)
 model_checkpoint = ModelCheckpoint(str(Path(str(Out_Path),'unet_zone.hdf5')), monitor='val_loss', verbose=0, save_best_only=True)
+
+# log all arguments including default ones
+arguments = vars(args)
+arguments["model"] = model.__name__
+with open('arguments.txt', 'w') as f:
+    f.write(json.dumps(arguments))
 
 steps_per_epoch = np.ceil(num_samples / batch_size)
 validation_steps = np.ceil(num_val_samples / batch_size)
@@ -160,8 +174,10 @@ for filename in Path(test_path,'images').rglob('*.png'):
     gt_path = str(Path(test_path,'masks_zones'))
     gt_name = filename.name.partition('.')[0] + '_zones.png'
     gt = io.imread(str(Path(gt_path,gt_name)), as_gray=True)
+
+    gt_norm = gt / gt.max()
     
-    DICE_all.append(distance.dice(gt.flatten(), img_mask_predicted_recons_unpad_norm.flatten()))
+    DICE_all.append(helper_functions.dice_discrete(gt.flatten(), img_mask_predicted_recons_unpad_norm.flatten()))
     DICE_avg = np.mean(DICE_all)
     EUCL_all.append(distance.euclidean(gt.flatten(), img_mask_predicted_recons_unpad_norm.flatten()))
     EUCL_avg = np.mean(EUCL_all)
