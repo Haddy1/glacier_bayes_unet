@@ -89,13 +89,7 @@ val_Generator = trainGenerator(batch_size = batch_size,
                         save_to_dir = None)
 
 
-if args.alpha and args.gamma:
-    #loss_parms = json.loads(args.Loss_Parms)
-    #loss_function = locals()[args.LOSS](**loss_parms)
-    loss_function = locals()[args.LOSS](alpha=args.alpha, gamma=args.gamma)
-else:
-    loss_function = locals()[args.LOSS]
-
+loss_function = locals()[args.LOSS]
 
 model = unet_Enze19_2(loss_function=loss_function)
 model_checkpoint = ModelCheckpoint(str(Path(str(Out_Path),'unet_zone.hdf5')), monitor='val_loss', verbose=0, save_best_only=True)
