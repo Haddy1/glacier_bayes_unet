@@ -13,5 +13,5 @@ class StoreDictKeyPair(argparse.Action):
          my_dict = {}
          for kv in values.split(","):
              k,v = kv.split("=")
-             my_dict[k] = v
+             my_dict[k] = float(v)
          setattr(namespace, self.dest, my_dict)
