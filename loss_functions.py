@@ -1,5 +1,7 @@
 from keras import backend as K
+import keras.losses
 import tensorflow as tf
+from scipy.spatial.distance import dice
 
 def focal_loss_nieradzik(alpha=1, gamma=0):
     def focal_loss_with_logits(logits, targets, alpha, gamma, y_pred):
@@ -31,18 +33,20 @@ def focal_loss(alpha=1, gamma=0):
 
 
 def dice_loss(y_true, y_pred):
-    numerator = 2 * K.sum(y_true * y_pred, axis=-1)
-    denominator = K.sum(y_true + y_pred, axis=-1)
+#    numerator = 2 * K.sum(y_true * y_pred, axis=-1)
+#    denominator = K.sum(y_true + y_pred, axis=-1)
+#
+#    return 1 - (numerator + 1) / (denominator + 1)
+    return dice(y_true, y_pred)
 
-    return 1 - (numerator + 1) / (denominator + 1)
 
-
-def combined_loss(*loss_functions):
+def combined_loss(loss_functions, split):
 
     def loss(y_true, y_pred):
+
         combined_result = 0
-        for loss_function in loss_functions:
-            combined_result += loss_function(y_true, y_pred)
+        for loss_function, weight in zip(loss_functions,split):
+            combined_result += weight * loss_function(y_true, y_pred)
 
         return combined_result
 
