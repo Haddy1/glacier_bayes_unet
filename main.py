@@ -58,7 +58,7 @@ if not os.path.exists(Path('data/train/aug')): os.makedirs(Path('data/train/aug'
 if not os.path.exists(Out_Path): os.makedirs(Out_Path)
 
 # log all arguments including default ones
-with open('arguments.txt', 'w') as f:
+with open(Path(Out_Path,'arguments.txt'), 'w') as f:
     f.write(json.dumps(vars(args)))
 
 
