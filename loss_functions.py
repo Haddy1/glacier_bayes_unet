@@ -21,7 +21,7 @@ def focal_loss_nieradzik(alpha=1, gamma=0):
 
     return loss
 
-def focal_loss(alpha=1, gamma=0):
+def focal_loss(alpha=1, gamma=1.5):
     def loss(y_true, y_pred):
         y_pred_stable = K.clip(y_pred, K.epsilon(), 1 - K.epsilon())
         weight_tp = alpha * (1 - y_pred) ** gamma * y_true * K.log(y_pred_stable)
