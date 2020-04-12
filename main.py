@@ -90,7 +90,7 @@ elif args.LOSS == 'focal_loss':
     else:
         loss_function = locals()[args.LOSS]()
 else:
-    loss_function = locals()[args.LOSS]()
+    loss_function = locals()[args.LOSS]
 
 
 #data_gen_args = dict(rotation_range=0.2,
