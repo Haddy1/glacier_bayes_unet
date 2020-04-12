@@ -198,7 +198,7 @@ for filename in Path(test_path,'images').rglob('*.png'):
 
     gt_norm = gt / gt.max()
 
-    DICE_all.append(distance.norm(gt_norm.flatten(), img_mask_predicted_recons_unpad_norm.flatten() / 255))
+    DICE_all.append(distance.dice(gt_norm.flatten(), img_mask_predicted_recons_unpad_norm.flatten() / 255))
     DICE_avg = np.mean(DICE_all)
     EUCL_all.append(distance.euclidean(gt_norm.flatten(), img_mask_predicted_recons_unpad_norm.flatten() /255 ))
     EUCL_avg = np.mean(EUCL_all)
