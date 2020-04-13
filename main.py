@@ -32,7 +32,7 @@ parser.add_argument('--Patch_Size', default=256, type=int, help='batch size (int
 parser.add_argument("--LOSS", help="loss function for the deep classifiers training ", choices=["binary_crossentropy", "focal_loss", "combined_loss"], default="binary_crossentropy")
 parser.add_argument('--Loss_Parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...", help='dictionary with parameters for loss function')
 
-parser.add_argument('--OUTPATH', default='output/results/21.09/', type=str, help='Output path for results')
+parser.add_argument('--OUTPATH', type=str, help='Output path for results')
 
 # parser.add_argument('--Random_Seed', default=1, type=int, help='random seed number value (any integer value)')
 
@@ -162,11 +162,18 @@ plt.show()
 #####################
 import skimage.io as io
 import Amir_utils
-from sklearn.metrics import classification_report
+from pathlib import Path
+from sklearn.metrics import f1_score, recall_score
 test_path = str(Path('data_'+str(PATCH_SIZE)+'/test/'))
+
+if not Out_Path:
+    Out_Path = Path('output')
 
 DICE_all = []
 EUCL_all = []
+Specificity_all =[]
+Sensitivity_all = []
+F1_all = []
 test_file_names = []
 Perf = {}
 for filename in Path(test_path,'images').rglob('*.png'):
@@ -191,19 +198,34 @@ for filename in Path(test_path,'images').rglob('*.png'):
 
     io.imsave(Path(str(Out_Path), Path(filename).name), img_mask_predicted_recons_unpad_norm)
 
-    # DICE
+
+    mask_predicted_norm = img_mask_predicted_recons_unpad_norm / img_mask_predicted_recons_unpad_norm.max()
+    mask_predicted_flat = mask_predicted_norm.flatten()
+
     gt_path = str(Path(test_path,'masks_zones'))
     gt_name = filename.name.partition('.')[0] + '_zones.png'
     gt = io.imread(str(Path(gt_path,gt_name)), as_gray=True)
 
     gt_norm = gt / gt.max()
+    gt_flat = gt_norm.flatten()
 
-    DICE_all.append(distance.dice(gt_norm.flatten(), img_mask_predicted_recons_unpad_norm.flatten() / 255))
+    Specificity_all.append(helper_functions.specificity(gt_flat, mask_predicted_flat))
+    Sensitivity_all.append(recall_score(gt_flat, mask_predicted_flat))
+    F1_all.append(f1_score(gt_flat, mask_predicted_flat))
+
+    # DICE
+    DICE_all.append(distance.dice(gt_flat, mask_predicted_flat))
     DICE_avg = np.mean(DICE_all)
-    EUCL_all.append(distance.euclidean(gt_norm.flatten(), img_mask_predicted_recons_unpad_norm.flatten() /255 ))
+    EUCL_all.append(distance.euclidean(gt_flat(), mask_predicted_flat))
     EUCL_avg = np.mean(EUCL_all)
     test_file_names.append(filename.name)
 
+Perf['Specificity_all'] = Specificity_all
+Perf['Specificity_avg'] = np.mean(Specificity_all)
+Perf['Sensitivity_all'] = Sensitivity_all
+Perf['Sensitivity_avg'] = np.mean(Sensitivity_all)
+Perf['F1_score_all'] = F1_all
+Perf['F1_score_avg'] = np.mean(F1_all)
 Perf['DICE_all'] = DICE_all
 Perf['DICE_avg'] = DICE_avg
 Perf['EUCL_all'] = EUCL_all
@@ -212,9 +234,13 @@ Perf['test_file_names'] = test_file_names
 np.savez(str(Path(str(Out_Path),'Performance.npz')), Perf)
 
 with open(str(Path(str(Out_Path) , 'ReportOnModel.txt')), 'a') as f:
-    f.write(str(Perf['DICE_avg']) + ', '
-            + str(Perf['EUCL_avg']) + '\n')
-    f.write(classification_report(gt_norm, img_mask_predicted_recons))
+    f.write('Dice\tEuclidian')
+    f.write(str(Perf['DICE_avg']) + '\t'
+          + str(Perf['EUCL_avg']) + '\n')
+    f.write('Sensitivity\tSpecificitiy\tf1_score')
+    f.write(str(Perf['Sensitivity_avg']) + '\t'
+      + str(Perf['Specificity_avg']) + '\t'
+      + str(Perf['F1_score_avg']) + '\n')
 
 END=time.time()
 print('Execution Time: ', END-START)
