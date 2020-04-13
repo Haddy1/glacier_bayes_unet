@@ -216,7 +216,7 @@ for filename in Path(test_path,'images').rglob('*.png'):
     # DICE
     DICE_all.append(distance.dice(gt_flat, mask_predicted_flat))
     DICE_avg = np.mean(DICE_all)
-    EUCL_all.append(distance.euclidean(gt_flat(), mask_predicted_flat))
+    EUCL_all.append(distance.euclidean(gt_flat, mask_predicted_flat))
     EUCL_avg = np.mean(EUCL_all)
     test_file_names.append(filename.name)
 
