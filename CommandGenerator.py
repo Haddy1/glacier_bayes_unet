@@ -1,4 +1,5 @@
 from pathlib import Path
+import numpy as np
 
 program = 'python3 main.py'
 nr_parallel_cmds = 4    # nr of scripts generated
@@ -68,7 +69,11 @@ for arg, value in arguments.items():
 
 
 # Write bash script file for each job
-cmd_per_job = len(cmds) // nr_parallel_cmds
+
+
+# indices evenly distributing commands among jobs
+cmd_indices = np.round(np.linspace(0,len(cmds), nr_parallel_cmds, endpoint=False)).astype(int).tolist() + [len(cmds)]
+
 for j_id in range(nr_parallel_cmds):
     with open('run_' + identifier + '_' + str(j_id) + '.sh', 'w') as script:
         # header
@@ -83,7 +88,8 @@ for j_id in range(nr_parallel_cmds):
             "#SBATCH -e " + identifier + "_" + str(j_id) + ".err\n"
         )
 
-        for cmd in cmds[j_id * cmd_per_job:cmd_per_job]:
+        nr_parallel_cmds -= 1
+        for cmd in cmds[cmd_indices[j_id]: cmd_indices[j_id+1]]:
             out = Path(out_path, identifier)
             script.write("\noutput=" + str(out) + "_`date +%m%d-%H%M%S`\n")     # output dir
             script.write(cmd + " --$out\n")

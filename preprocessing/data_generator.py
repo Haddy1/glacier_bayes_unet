@@ -74,7 +74,7 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
 def generate_subset(data_dir, out_dir, set_size, patch_size=256, preprocessor=None):
     files_img = list(Path(data_dir, 'images').glob('*.png'))
     img_subset = random.sample(files_img, set_size)
-    process_data(generate_subset(data_dir, out_dir, set_size, patch_size=patch_size, preprocessor=preprocessor, img_list=img_subset))
+    process_data(data_dir, out_dir, patch_size=patch_size, preprocessor=preprocessor, img_list=img_subset)
 
 
 
