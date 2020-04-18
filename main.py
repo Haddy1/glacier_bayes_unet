@@ -51,8 +51,8 @@ if args.data_path:
 else:
     data_path = Path('data')
 
-num_samples = len([file for file in Path(data_path, '/train/images/').rglob('*.png')]) # number of training samples
-num_val_samples = len([file for file in Path(data_path, '/val/images/').rglob('*.png')]) # number of validation samples
+num_samples = len([file for file in Path(data_path, 'train/images').rglob('*.png')]) # number of training samples
+num_val_samples = len([file for file in Path(data_path, 'val/images').rglob('*.png')]) # number of validation samples
 
 if args.out:
     out_path = Path(args.out)
