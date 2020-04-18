@@ -24,15 +24,16 @@ parser = argparse.ArgumentParser(description='Glacier Front Segmentation')
 # parser.add_argument('--Validation_Size', default=0.1, type=float, help='Validation set ratio for splitting from the training set (values between 0 and 1)')
 
 # parser.add_argument('--Classifier', default='unet', type=str, help='Classifier to use (unet/unet_Enze19)')
-parser.add_argument('--Epochs', default=100, type=int, help='number of training epochs (integer value > 0)')
-parser.add_argument('--Batch_Size', default=100, type=int, help='batch size (integer value)')
-parser.add_argument('--Patch_Size', default=256, type=int, help='batch size (integer value)')
+parser.add_argument('--epochs', default=100, type=int, help='number of training epochs (integer value > 0)')
+parser.add_argument('--batch_size', default=100, type=int, help='batch size (integer value)')
+parser.add_argument('--patch_size', default=256, type=int, help='batch size (integer value)')
 
 # parser.add_argument('--EARLY_STOPPING', default=1, type=int, help='If 1, classifier is using early stopping based on validation loss with patience 20 (0/1)')
-parser.add_argument("--LOSS", help="loss function for the deep classifiers training ", choices=["binary_crossentropy", "focal_loss", "combined_loss"], default="binary_crossentropy")
-parser.add_argument('--Loss_Parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...", help='dictionary with parameters for loss function')
+parser.add_argument("--loss", help="loss function for the deep classifiers training ", choices=["binary_crossentropy", "focal_loss", "combined_loss"], default="binary_crossentropy")
+parser.add_argument('--loss_parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...", help='dictionary with parameters for loss function')
 
-parser.add_argument('--OUTPATH', type=str, help='Output path for results')
+parser.add_argument('--out', type=str, help='Output path for results')
+parser.add_argument('--data_path', type=str, help='Path containing training and validation data')
 
 # parser.add_argument('--Random_Seed', default=1, type=int, help='random seed number value (any integer value)')
 
@@ -41,34 +42,40 @@ args = parser.parse_args()
 #%%
 START=time.time()
 
-PATCH_SIZE = args.Patch_Size
-batch_size = args.Batch_Size
+PATCH_SIZE = args.patch_size
+batch_size = args.batch_size
+
 
 
 num_samples = len([file for file in Path('data_'+str(PATCH_SIZE)+'/train/images/').rglob('*.png')]) # number of training samples
 num_val_samples = len([file for file in Path('data_'+str(PATCH_SIZE)+'/val/images/').rglob('*.png')]) # number of validation samples
 
-if args.OUTPATH:
-    Out_Path = args.OUTPATH
+if args.out:
+    out_path = Path(args.out)
 else:
-    Out_Path = Path('data_'+str(PATCH_SIZE)+'/test/masks_predicted_'+ time.strftime("%y%m%d-%H%M%S"))
+    out_path = Path('data_' + str(PATCH_SIZE) + '/test/masks_predicted_' + time.strftime("%y%m%d-%H%M%S"))
+
+if args.data_path:
+    data_path = Path(args.data_path)
+else:
+    data_path = Path('data')
 
 
-if not os.path.exists(Path('data/train/aug')): os.makedirs(Path('data/train/aug'))
-if not os.path.exists(Out_Path): os.makedirs(Out_Path)
+if not out_path.exists():
+    out_path.mkdir(parents=True)
 
 # log all arguments including default ones
-with open(Path(Out_Path,'arguments.txt'), 'w') as f:
+with open(Path(out_path, 'arguments.txt'), 'w') as f:
     f.write(json.dumps(vars(args)))
 
 
-if args.LOSS == "combined_loss":
-    if not args.Loss_Parms:
+if args.loss == "combined_loss":
+    if not args.loss_parms:
         print("combined_loss needs loss functions as parameter")
     else:
         functions = []
         split = []
-        for func_name, weight in args.Loss_Parms.items():
+        for func_name, weight in args.loss_parms.items():
 
             # for functions with additional parameters
             # generate loss function with default parameters
@@ -83,14 +90,14 @@ if args.LOSS == "combined_loss":
         loss_function = combined_loss(functions, split)
 
 # for loss functions with additional parameters call to get function with y_true, y_pred arguments
-elif args.LOSS == 'focal_loss':
-    if args.Loss_Parms:
-        loss_function = locals()[args.LOSS](**args.Loss_Parms)
+elif args.loss == 'focal_loss':
+    if args.loss_parms:
+        loss_function = locals()[args.loss](**args.loss_parms)
         #loss_function = locals()[args.LOSS](alpha=args.alpha, gamma=args.gamma)
     else:
-        loss_function = locals()[args.LOSS]()
+        loss_function = locals()[args.loss]()
 else:
-    loss_function = locals()[args.LOSS]
+    loss_function = locals()[args.loss]
 
 
 #data_gen_args = dict(rotation_range=0.2,
@@ -104,14 +111,14 @@ data_gen_args = dict(horizontal_flip=True,
                     fill_mode='nearest')
 
 train_Generator = trainGenerator(batch_size = batch_size,
-                        train_path = str(Path('data_'+str(PATCH_SIZE)+'/train')),
+                        train_path = str(Path(data_path, 'train')),
                         image_folder = 'images',
                         mask_folder = 'masks_zones',
                         aug_dict = data_gen_args,
                         save_to_dir = None)
 
 val_Generator = trainGenerator(batch_size = batch_size,
-                        train_path = str(Path('data_'+str(PATCH_SIZE)+'/val')),
+                        train_path = str(Path(data_path, 'val')),
                         image_folder = 'images',
                         mask_folder = 'masks_zones',
                         aug_dict = None,
@@ -120,7 +127,7 @@ val_Generator = trainGenerator(batch_size = batch_size,
 
 
 model = unet_Enze19_2(loss_function=loss_function)
-model_checkpoint = ModelCheckpoint(str(Path(str(Out_Path),'unet_zone.hdf5')), monitor='val_loss', verbose=0, save_best_only=True)
+model_checkpoint = ModelCheckpoint(str(Path(str(out_path), 'unet_zone.hdf5')), monitor='val_loss', verbose=0, save_best_only=True)
 
 
 steps_per_epoch = np.ceil(num_samples / batch_size)
@@ -145,7 +152,7 @@ plt.ylabel('loss')
 plt.legend(loc='upper right')
 plt.minorticks_on()
 plt.grid(which='minor', linestyle='--')
-plt.savefig(str(Path(str(Out_Path),'loss_plot.png')), bbox_inches='tight', format='png', dpi=200)
+plt.savefig(str(Path(str(out_path), 'loss_plot.png')), bbox_inches='tight', format='png', dpi=200)
 plt.show()
 
 # # save model
@@ -166,8 +173,8 @@ from pathlib import Path
 from sklearn.metrics import f1_score, recall_score
 test_path = str(Path('data_'+str(PATCH_SIZE)+'/test/'))
 
-if not Out_Path:
-    Out_Path = Path('output')
+if not out_path:
+    out_path = Path('output')
 
 DICE_all = []
 EUCL_all = []
@@ -196,7 +203,7 @@ for filename in Path(test_path,'images').rglob('*.png'):
     img_mask_predicted_recons_unpad_norm[img_mask_predicted_recons_unpad_norm < 127] = 0
     img_mask_predicted_recons_unpad_norm[img_mask_predicted_recons_unpad_norm >= 127] = 255
 
-    io.imsave(Path(str(Out_Path), Path(filename).name), img_mask_predicted_recons_unpad_norm)
+    io.imsave(Path(str(out_path), Path(filename).name), img_mask_predicted_recons_unpad_norm)
 
 
     mask_predicted_norm = img_mask_predicted_recons_unpad_norm / img_mask_predicted_recons_unpad_norm.max()
@@ -215,25 +222,25 @@ for filename in Path(test_path,'images').rglob('*.png'):
 
     # DICE
     DICE_all.append(distance.dice(gt_flat, mask_predicted_flat))
-    DICE_avg = np.mean(DICE_all)
+    DICE_avg = np.mean(np.array(DICE_all))
     EUCL_all.append(distance.euclidean(gt_flat, mask_predicted_flat))
-    EUCL_avg = np.mean(EUCL_all)
+    EUCL_avg = np.mean(np.array(EUCL_all))
     test_file_names.append(filename.name)
 
 Perf['Specificity_all'] = Specificity_all
-Perf['Specificity_avg'] = np.mean(Specificity_all)
+Perf['Specificity_avg'] = np.mean(np.array(Specificity_all))
 Perf['Sensitivity_all'] = Sensitivity_all
-Perf['Sensitivity_avg'] = np.mean(Sensitivity_all)
+Perf['Sensitivity_avg'] = np.mean(np.array(Sensitivity_all))
 Perf['F1_score_all'] = F1_all
-Perf['F1_score_avg'] = np.mean(F1_all)
+Perf['F1_score_avg'] = np.mean(np.array(F1_all))
 Perf['DICE_all'] = DICE_all
 Perf['DICE_avg'] = DICE_avg
 Perf['EUCL_all'] = EUCL_all
 Perf['EUCL_avg'] = EUCL_avg
 Perf['test_file_names'] = test_file_names
-np.savez(str(Path(str(Out_Path),'Performance.npz')), Perf)
+#np.savez(str(Path(str(out_path), 'Performance.npz')), Perf)
 
-with open(str(Path(str(Out_Path) , 'ReportOnModel.txt')), 'a') as f:
+with open(str(Path(str(out_path) , 'ReportOnModel.txt')), 'a') as f:
     f.write('Dice\tEuclidian')
     f.write(str(Perf['DICE_avg']) + '\t'
           + str(Perf['EUCL_avg']) + '\n')

@@ -2,12 +2,22 @@ import numpy as np
 import argparse
 import keras.backend as K
 
-# Dice distance measure for non boolean values
-def dice_discrete(u,v):
-    c_uv = K.multiply(u, v).sum()
-    c_u = K.square(u).sum()
-    c_v = K.square(v).sum()
-    return 1 - (2 * c_uv / (c_u + c_v + K.epsilon()))
+def dice_coefficient(u,v):
+    """
+    For binary vectors the Dice cooefficient can be written as
+    2 * |u * v| / (|u**2| + |v**2|)
+
+    | u * v | gives intersecting set
+    |u**2|, |v**2| number of (true) elements in set
+
+    :param u:  binary vector
+    :param v:  binary vector of same length as u
+    :return:   dice coefficient
+    """
+    c_uv = K.sum(u*v)
+    c_u = K.sum(u**2)
+    c_v = K.sum(v**2)
+    return 2 * K.sum(u * v)/ (K.sum(u**2) + K.sum(v**2) + K.epsilon())
 
 def specificity(y_true, y_pred):
     neg_y_true = 1 - y_true

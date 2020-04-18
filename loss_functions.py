@@ -4,13 +4,6 @@ import tensorflow as tf
 from scipy.spatial.distance import dice
 
 def focal_loss(alpha=1, gamma=1.5):
-    """
-    Returns a focal loss function using arguments as parameters
-
-    :param alpha:
-    :param gamma:
-    :return:
-    """
     def loss(y_true, y_pred):
         """
         Focal loss using the binary crossentropy implementation of keras as blueprint
@@ -29,11 +22,13 @@ def focal_loss(alpha=1, gamma=1.5):
 
 
 
-def dice_loss(y_true, y_pred):
-    numerator = 2 * K.sum(y_true * y_pred, axis=-1)
-    denominator = K.sum(y_true + y_pred, axis=-1)
 
-    return 1 - (numerator + 1) / (denominator + 1)
+def weighted_dice_loss(beta):
+    def dice_loss(y_true, y_pred):
+        numerator = 2 * K.sum(y_true * y_pred, axis=-1)
+        denominator = K.sum(y_true + y_pred, axis=-1)
+
+        return 1 - (numerator + 1) / (denominator + 1)
 
 
 def combined_loss(loss_functions, split):

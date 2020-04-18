@@ -25,8 +25,10 @@ F1_all = []
 test_file_names = []
 Perf = {}
 test_path="data_256/test"
-predict_path = Path("output/results_0412-235548_binary_crossentropy")
+out_path = Path("output")
 
+#for predict_path in out_path.glob('result*'):
+predict_path = Path('data_256_bak/test/masks_predicted_200405-221056')
 for filename in Path(test_path,'images').rglob('*.png'):
     gt_path = str(Path(test_path,'masks_zones'))
     gt_name = filename.name.partition('.')[0] + '_zones.png'
@@ -62,6 +64,7 @@ Perf['DICE_avg'] = DICE_avg
 Perf['EUCL_all'] = EUCL_all
 Perf['EUCL_avg'] = EUCL_avg
 Perf['test_file_names'] = test_file_names
+print(predict_path)
 print('Dice\tEuclidian')
 print(str(Perf['DICE_avg']) + '\t'
         + str(Perf['EUCL_avg']) + '\n')
@@ -69,6 +72,15 @@ print('Sensitivity\tSpecificitiy\tf1_score')
 print(str(Perf['Sensitivity_avg']) + '\t'
         + str(Perf['Specificity_avg']) + '\t'
         + str(Perf['F1_score_avg']) + '\n')
+
+with open(str(Path(predict_path , 'ReportOnModel.txt')), 'w') as f:
+    f.write('Dice\tEuclidian\n')
+    f.write(str(Perf['DICE_avg']) + '\t'
+            + str(Perf['EUCL_avg']) + '\n')
+    f.write('Sensitivity\tSpecificitiy\tf1_score\n')
+    f.write(str(Perf['Sensitivity_avg']) + '\t'
+            + str(Perf['Specificity_avg']) + '\t'
+            + str(Perf['F1_score_avg']) + '\n')
 
 #%%
 #import imageio
