@@ -13,7 +13,8 @@ arguments = {
         'focal_loss': [0.0,0.2,0.4,0.6,0.8,1.0]
     },
     'batch_size':16,
-    'data_path': 'data_' + str(patch_size),
+    'patch_size':256,
+    'data_path': 'data_256_small'
 }
 
 # Don't change anything below this line
@@ -90,9 +91,9 @@ for j_id in range(nr_parallel_cmds):
 
         nr_parallel_cmds -= 1
         for cmd in cmds[cmd_indices[j_id]: cmd_indices[j_id+1]]:
-            out = Path(out_path, identifier)
+            out = Path(out_path, identifier + "_" + str(j_id))
             script.write("\noutput=" + str(out) + "_`date +%m%d-%H%M%S`\n")     # output dir
-            script.write(cmd + " --$out\n")
+            script.write(cmd + " --out $output\n")
 
 
 

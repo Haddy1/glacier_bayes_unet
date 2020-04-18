@@ -46,19 +46,19 @@ PATCH_SIZE = args.patch_size
 batch_size = args.batch_size
 
 
+if args.data_path:
+    data_path = Path(args.data_path)
+else:
+    data_path = Path('data')
 
-num_samples = len([file for file in Path('data_'+str(PATCH_SIZE)+'/train/images/').rglob('*.png')]) # number of training samples
-num_val_samples = len([file for file in Path('data_'+str(PATCH_SIZE)+'/val/images/').rglob('*.png')]) # number of validation samples
+num_samples = len([file for file in Path(data_path, '/train/images/').rglob('*.png')]) # number of training samples
+num_val_samples = len([file for file in Path(data_path, '/val/images/').rglob('*.png')]) # number of validation samples
 
 if args.out:
     out_path = Path(args.out)
 else:
     out_path = Path('data_' + str(PATCH_SIZE) + '/test/masks_predicted_' + time.strftime("%y%m%d-%H%M%S"))
 
-if args.data_path:
-    data_path = Path(args.data_path)
-else:
-    data_path = Path('data')
 
 
 if not out_path.exists():
@@ -134,7 +134,7 @@ steps_per_epoch = np.ceil(num_samples / batch_size)
 validation_steps = np.ceil(num_val_samples / batch_size)
 History = model.fit_generator(train_Generator,
                     steps_per_epoch=steps_per_epoch,
-                    epochs=args.Epochs,
+                    epochs=args.epochs,
                     validation_data=val_Generator,
                     validation_steps=validation_steps,
                     callbacks=[model_checkpoint])
@@ -171,7 +171,7 @@ import skimage.io as io
 import Amir_utils
 from pathlib import Path
 from sklearn.metrics import f1_score, recall_score
-test_path = str(Path('data_'+str(PATCH_SIZE)+'/test/'))
+test_path = str(Path(data_path,'/test/'))
 
 if not out_path:
     out_path = Path('output')
