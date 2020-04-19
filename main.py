@@ -172,7 +172,7 @@ import skimage.io as io
 import Amir_utils
 from pathlib import Path
 from sklearn.metrics import f1_score, recall_score
-test_path = str(Path(data_path,'/test/'))
+test_path = str(Path(data_path,'test'))
 
 if not out_path:
     out_path = Path('output')
