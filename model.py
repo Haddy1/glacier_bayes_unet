@@ -214,6 +214,7 @@ def unet_Enze19_2(pretrained_weights = None,input_size = (256,256,1), loss_funct
     conv10 = Conv2D(1, 3, padding = 'same', activation = 'sigmoid')(conv9)
 
     model = Model(input = inputs, output = conv10)
+    model.name = 'unet_Enze19_2'
 
     model.compile(optimizer = Adam(lr = 1e-4), loss = loss_function, metrics = ['accuracy'])
     

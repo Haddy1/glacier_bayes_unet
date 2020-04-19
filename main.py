@@ -2,6 +2,7 @@ import argparse
 import os
 import time
 from pathlib import Path
+import pickle
 import json
 
 # matplotlib.use('ps')
@@ -15,7 +16,7 @@ from data import trainGenerator
 from model import unet_Enze19_2
 import helper_functions
 from loss_functions import *
-from keras.losses import *
+from keras.losses import *  # Don't remove
 
 #%% Hyper-parameter tuning
 parser = argparse.ArgumentParser(description='Glacier Front Segmentation')
@@ -68,7 +69,7 @@ if not out_path.exists():
 with open(Path(out_path, 'arguments.txt'), 'w') as f:
     f.write(json.dumps(vars(args)))
 
-
+bin = binary_crossentropy
 if args.loss == "combined_loss":
     if not args.loss_parms:
         print("combined_loss needs loss functions as parameter")
@@ -156,7 +157,7 @@ plt.savefig(str(Path(str(out_path), 'loss_plot.png')), bbox_inches='tight', form
 plt.show()
 
 # # save model
-# model.save(str(Path(OUTPUT_PATH + 'MyModel' + SaveName + '.h5').absolute()))
+model.save(str(Path(out_path,'model_' + model.name + '.h5').absolute()))
 ##########
 ##########
 
@@ -222,23 +223,22 @@ for filename in Path(test_path,'images').rglob('*.png'):
 
     # DICE
     DICE_all.append(distance.dice(gt_flat, mask_predicted_flat))
-    DICE_avg = np.mean(np.array(DICE_all))
     EUCL_all.append(distance.euclidean(gt_flat, mask_predicted_flat))
-    EUCL_avg = np.mean(np.array(EUCL_all))
     test_file_names.append(filename.name)
 
 Perf['Specificity_all'] = Specificity_all
-Perf['Specificity_avg'] = np.mean(np.array(Specificity_all))
+Perf['Specificity_avg'] = np.mean(Specificity_all)
 Perf['Sensitivity_all'] = Sensitivity_all
-Perf['Sensitivity_avg'] = np.mean(np.array(Sensitivity_all))
+Perf['Sensitivity_avg'] = np.mean(Sensitivity_all)
 Perf['F1_score_all'] = F1_all
-Perf['F1_score_avg'] = np.mean(np.array(F1_all))
+Perf['F1_score_avg'] = np.mean(F1_all)
 Perf['DICE_all'] = DICE_all
-Perf['DICE_avg'] = DICE_avg
+Perf['DICE_avg'] = np.mean(DICE_all)
 Perf['EUCL_all'] = EUCL_all
-Perf['EUCL_avg'] = EUCL_avg
+Perf['EUCL_avg'] = np.mean(EUCL_all)
 Perf['test_file_names'] = test_file_names
-#np.savez(str(Path(str(out_path), 'Performance.npz')), Perf)
+
+pickle.dump(Perf, Path(out_path, 'performance.pkl'))
 
 with open(str(Path(str(out_path) , 'ReportOnModel.txt')), 'a') as f:
     f.write('Dice\tEuclidian')
