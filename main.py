@@ -211,8 +211,7 @@ for filename in Path(test_path,'images').rglob('*.png'):
     mask_predicted_flat = mask_predicted_norm.flatten()
 
     gt_path = str(Path(test_path,'masks_zones'))
-    gt_name = filename.name.partition('.')[0] + '_zones.png'
-    gt = io.imread(str(Path(gt_path,gt_name)), as_gray=True)
+    gt = io.imread(str(Path(gt_path,filename.name)), as_gray=True)
 
     gt_norm = gt / gt.max()
     gt_flat = gt_norm.flatten()
