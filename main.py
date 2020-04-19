@@ -212,7 +212,7 @@ for filename in Path(test_path,'images').rglob('*.png'):
     else:
         mask_predicted_norm = img_mask_predicted_recons_unpad_norm
 
-    mask_predicted_flat = mask_predicted_norm.flatten()
+    mask_predicted_flat = mask_predicted_norm.flatten().astype(int)
 
     gt_path = str(Path(test_path,'masks_zones'))
     gt = io.imread(str(Path(gt_path,filename.name)), as_gray=True)
@@ -222,7 +222,7 @@ for filename in Path(test_path,'images').rglob('*.png'):
         gt_norm = gt / gt.max()
     else:
         gt_norm = gt
-    gt_flat = gt_norm.flatten()
+    gt_flat = gt_norm.flatten().astype(int)
 
     Specificity_all.append(helper_functions.specificity(gt_flat, mask_predicted_flat))
     Sensitivity_all.append(recall_score(gt_flat, mask_predicted_flat))
