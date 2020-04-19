@@ -206,14 +206,22 @@ for filename in Path(test_path,'images').rglob('*.png'):
 
     io.imsave(Path(str(out_path), Path(filename).name), img_mask_predicted_recons_unpad_norm)
 
+    mask_max = img_mask_predicted_recons_unpad_norm.max()
+    if mask_max > 0:
+        mask_predicted_norm = img_mask_predicted_recons_unpad_norm / img_mask_predicted_recons_unpad_norm.max()
+    else:
+        mask_predicted_norm = img_mask_predicted_recons_unpad_norm
 
-    mask_predicted_norm = img_mask_predicted_recons_unpad_norm / img_mask_predicted_recons_unpad_norm.max()
     mask_predicted_flat = mask_predicted_norm.flatten()
 
     gt_path = str(Path(test_path,'masks_zones'))
     gt = io.imread(str(Path(gt_path,filename.name)), as_gray=True)
 
-    gt_norm = gt / gt.max()
+    max = gt.max()
+    if max >0:
+        gt_norm = gt / gt.max()
+    else:
+        gt_norm = gt
     gt_flat = gt_norm.flatten()
 
     Specificity_all.append(helper_functions.specificity(gt_flat, mask_predicted_flat))
@@ -221,7 +229,7 @@ for filename in Path(test_path,'images').rglob('*.png'):
     F1_all.append(f1_score(gt_flat, mask_predicted_flat))
 
     # DICE
-    DICE_all.append(distance.dice(gt_flat, mask_predicted_flat))
+    DICE_all.append(helper_functions.dice_coefficient(gt_flat, mask_predicted_flat))
     EUCL_all.append(distance.euclidean(gt_flat, mask_predicted_flat))
     test_file_names.append(filename.name)
 
