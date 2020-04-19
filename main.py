@@ -241,10 +241,10 @@ Perf['test_file_names'] = test_file_names
 pickle.dump(Perf, open(Path(out_path, 'performance.pkl'), 'wb'))
 
 with open(str(Path(str(out_path) , 'ReportOnModel.txt')), 'w') as f:
-    f.write('Dice\tEuclidian')
+    f.write('Dice\tEuclidian\n')
     f.write(str(Perf['DICE_avg']) + '\t'
           + str(Perf['EUCL_avg']) + '\n')
-    f.write('Sensitivity\tSpecificitiy\tf1_score')
+    f.write('Sensitivity\tSpecificitiy\tf1_score\n')
     f.write(str(Perf['Sensitivity_avg']) + '\t'
       + str(Perf['Specificity_avg']) + '\t'
       + str(Perf['F1_score_avg']) + '\n')
