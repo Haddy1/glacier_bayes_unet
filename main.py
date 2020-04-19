@@ -238,7 +238,7 @@ Perf['EUCL_all'] = EUCL_all
 Perf['EUCL_avg'] = np.mean(EUCL_all)
 Perf['test_file_names'] = test_file_names
 
-pickle.dump(Perf, Path(out_path, 'performance.pkl'))
+pickle.dump(Perf, open(Path(out_path, 'performance.pkl'), 'w'))
 
 with open(str(Path(str(out_path) , 'ReportOnModel.txt')), 'a') as f:
     f.write('Dice\tEuclidian')
