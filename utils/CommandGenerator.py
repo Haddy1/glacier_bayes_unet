@@ -2,8 +2,8 @@ from pathlib import Path
 import numpy as np
 
 program = 'python3 main.py'
-nr_parallel_cmds = 4    # nr of scripts generated
-out_path = '../output'  # where results should be written to
+nr_parallel_cmds = 3    # nr of scripts generated
+out_path = 'output'     # where results should be written to
 identifier = 'combined_loss'
 patch_size = 256
 arguments = {
@@ -14,7 +14,7 @@ arguments = {
     },
     'batch_size':16,
     'patch_size':256,
-    'data_path': 'data_256_small'
+    'data_path': 'data_256'
 }
 
 # Don't change anything below this line
