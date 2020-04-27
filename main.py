@@ -1,42 +1,36 @@
 import argparse
-import os
 import time
 from pathlib import Path
 import pickle
 import json
+from shutil import copy
 
-# matplotlib.use('ps')
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 from keras.callbacks import ModelCheckpoint
 from scipy.spatial import distance
+import os
 
 from data import trainGenerator
 from model import unet_Enze19_2
-import helper_functions
+from utils import helper_functions
 from loss_functions import *
-from keras.losses import *  # Don't remove
 
 #%% Hyper-parameter tuning
 parser = argparse.ArgumentParser(description='Glacier Front Segmentation')
 
-# parser.add_argument('--Test_Size', default=0.2, type=float, help='Test set ratio for splitting from the whole dataset (values between 0 and 1)')
-# parser.add_argument('--Validation_Size', default=0.1, type=float, help='Validation set ratio for splitting from the training set (values between 0 and 1)')
-
-# parser.add_argument('--Classifier', default='unet', type=str, help='Classifier to use (unet/unet_Enze19)')
 parser.add_argument('--epochs', default=100, type=int, help='number of training epochs (integer value > 0)')
 parser.add_argument('--batch_size', default=100, type=int, help='batch size (integer value)')
 parser.add_argument('--patch_size', default=256, type=int, help='batch size (integer value)')
 
-# parser.add_argument('--EARLY_STOPPING', default=1, type=int, help='If 1, classifier is using early stopping based on validation loss with patience 20 (0/1)')
 parser.add_argument("--loss", help="loss function for the deep classifiers training ", choices=["binary_crossentropy", "focal_loss", "combined_loss"], default="binary_crossentropy")
 parser.add_argument('--loss_parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...", help='dictionary with parameters for loss function')
+parser.add_argument('--image_aug', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...",
+                    help='dictionary with the augmentation for keras Image Processing', default={'horizontal_flip':True,'rotation_range':90, 'fill_mode':nearest})
 
 parser.add_argument('--out', type=str, help='Output path for results')
 parser.add_argument('--data_path', type=str, help='Path containing training and validation data')
-
-# parser.add_argument('--Random_Seed', default=1, type=int, help='random seed number value (any integer value)')
 
 args = parser.parse_args()
 
@@ -66,10 +60,14 @@ if not out_path.exists():
     out_path.mkdir(parents=True)
 
 # log all arguments including default ones
-with open(Path(out_path, 'arguments.txt'), 'w') as f:
+with open(Path(out_path, 'arguments.json'), 'w') as f:
     f.write(json.dumps(vars(args)))
 
-bin = binary_crossentropy
+# copy image file list to output
+for d in data_path.iterdir():
+    if Path(d, 'image_list.json').exists():
+        copy(Path(d, 'image_list.json'), Path(out_path, d.name + '_image_list.json'))
+
 if args.loss == "combined_loss":
     if not args.loss_parms:
         print("combined_loss needs loss functions as parameter")
@@ -101,21 +99,15 @@ else:
     loss_function = locals()[args.loss]
 
 
-#data_gen_args = dict(rotation_range=0.2,
-#                    width_shift_range=0.05,
-#                    height_shift_range=0.05,
-#                    shear_range=0.05,
-#                    zoom_range=0.05,
-#                    horizontal_flip=True,
-#                    fill_mode='nearest')
 data_gen_args = dict(horizontal_flip=True,
+                     rotation_range=90,
                     fill_mode='nearest')
 
 train_Generator = trainGenerator(batch_size = batch_size,
                         train_path = str(Path(data_path, 'train')),
                         image_folder = 'images',
                         mask_folder = 'masks_zones',
-                        aug_dict = data_gen_args,
+                        aug_dict = args.image_aug,
                         save_to_dir = None)
 
 val_Generator = trainGenerator(batch_size = batch_size,
@@ -139,7 +131,6 @@ History = model.fit_generator(train_Generator,
                     validation_data=val_Generator,
                     validation_steps=validation_steps,
                     callbacks=[model_checkpoint])
-#model.fit_generator(train_Generator, steps_per_epoch=300, epochs=1, callbacks=[model_checkpoint], class_weight=[0.0000001,0.9999999])
 
 ##########
 ##########
@@ -158,6 +149,11 @@ plt.show()
 
 # # save model
 model.save(str(Path(out_path,'model_' + model.name + '.h5').absolute()))
+pickle.dumps(open(Path(out_path, 'loss_function' + model.name + '.pkl'), 'w'), loss_function)
+
+# Don"t need checkpoint model anymore
+os.remove(Path(str(out_path), 'unet_zone.hdf5'))
+
 ##########
 ##########
 
@@ -184,6 +180,10 @@ Sensitivity_all = []
 F1_all = []
 test_file_names = []
 Perf = {}
+
+img_list = None
+
+
 for filename in Path(test_path,'images').rglob('*.png'):
     img = io.imread(filename, as_gray=True)
     img = img / 255

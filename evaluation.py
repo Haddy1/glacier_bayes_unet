@@ -1,16 +1,12 @@
-import numpy as np
-from pathlib import Path
-import imageio
-from matplotlib import pyplot as plt
-
 #%%
 import skimage.io as io
 from pathlib import Path
-import Amir_utils
 from scipy.spatial import distance
 import numpy as np
-from sklearn.metrics import classification_report, f1_score, precision_score, recall_score
-import helper_functions
+from sklearn.metrics import f1_score, recall_score
+from utils import helper_functions
+
+
 # DICE
 def own_dice(u,v):
     c_uv = np.equal(u,v).sum()
@@ -26,29 +22,30 @@ test_file_names = []
 Perf = {}
 test_path="data_256/test"
 out_path = Path("output")
-
-#for predict_path in out_path.glob('result*'):
-predict_path = Path('data_256_bak/test/masks_predicted_200405-221056')
+predict_path = "/home/andreas/uni/thesis/src/combined_loss_0_0426-113130"
+#for predict_path in out_path.glob('combined*'):
 for filename in Path(test_path,'images').rglob('*.png'):
     gt_path = str(Path(test_path,'masks_zones'))
     gt_name = filename.name.partition('.')[0] + '_zones.png'
     gt = io.imread(str(Path(gt_path,gt_name)), as_gray=True)
-    img_mask_predicted_recons_unpad_norm = io.imread(Path(predict_path,filename.name), as_gray=True)
+    pred = io.imread(Path(predict_path,filename.name), as_gray=True)
 
-    gt_bool = gt/gt.max()
-    gt_flat = gt_bool.flatten()
 
-    pred_bool = img_mask_predicted_recons_unpad_norm / img_mask_predicted_recons_unpad_norm.max()
-    mask_predicted_flat = pred_bool.flatten()
+    gt = (gt > 200).astype(int)
+    pred = (pred > 200).astype(int)
 
-    Specificity_all.append(helper_functions.specificity(gt_flat, mask_predicted_flat))
-    Sensitivity_all.append(recall_score(gt_flat, mask_predicted_flat))
-    F1_all.append(f1_score(gt_flat, mask_predicted_flat))
+    gt_flat = gt.flatten()
+
+    pred_flat = pred.flatten()
+
+    Specificity_all.append(helper_functions.specificity(gt_flat, pred_flat))
+    Sensitivity_all.append(recall_score(gt_flat, pred_flat))
+    F1_all.append(f1_score(gt_flat, pred_flat))
 
    # DICE_all.append(distance.dice(gt_bool.flatten(), pred_bool.flatten()))
-    DICE_all.append(distance.dice(gt_flat, mask_predicted_flat))
+    DICE_all.append(helper_functions.dice_coefficient(gt_flat, pred_flat))
     DICE_avg = np.mean(DICE_all)
-    EUCL_all.append(distance.euclidean(gt_flat, mask_predicted_flat))
+    EUCL_all.append(distance.euclidean(gt_flat, pred_flat))
     EUCL_avg = np.mean(EUCL_all)
     test_file_names.append(filename.name)
 

@@ -14,18 +14,21 @@ def dice_coefficient(u,v):
     :param v:  binary vector of same length as u
     :return:   dice coefficient
     """
-    c_uv = K.sum(u*v)
-    c_u = K.sum(u**2)
-    c_v = K.sum(v**2)
-    return 2 * K.sum(u * v)/ (K.sum(u**2) + K.sum(v**2) + K.epsilon())
+    c_uv = np.sum(u*v)
+    if c_uv == 0:
+        return 0
+    else:
+        c_u = np.sum(u**2)
+        c_v = np.sum(v**2)
+    return 2 * c_uv / (c_u + c_v)
 
 def specificity(y_true, y_pred):
     neg_y_true = 1 - y_true
     neg_y_pred = 1 - y_pred
-    fp = K.sum(neg_y_true * y_pred)
-    tn = K.sum(neg_y_true * neg_y_pred)
-    specificity = tn / (tn + fp + K.epsilon())
-    return specificity
+    fp = np.sum(neg_y_true * y_pred)
+    tn = np.sum(neg_y_true * neg_y_pred)
+    result = tn / (tn + fp + K.epsilon())
+    return result
 
 
 class StoreDictKeyPair(argparse.Action):

@@ -1,4 +1,8 @@
 import numpy
+from pathlib import Path
+import json
+import imageio as io
+import cv2
 
 def extract_grayscale_patches( img, shape, offset=(0,0), stride=(1,1) ):
     """ Adopted from: http://jamesgregson.ca/extract-image-patches-in-python.html """
@@ -72,3 +76,57 @@ def reconstruct_from_grayscale_patches( patches, origin, epsilon=1e-12 ):
 
     return out/numpy.maximum( wgt, epsilon ), wgt
 
+def reconstruct_from_img_list(image_list_file, out_path=None):
+    """
+    Reconstruct image patches using image list containing indices and origin for patches in subpaths of image list file directory
+
+    :param image_list_file: Path of 'image_list.json'
+    :param out_path:    optional - Instead of returning reconstructed images as list write them into ouput directory
+                                    useful for large image collection
+    :return:    tuple containing lists containing the reconstructed images for each subpath
+    """
+    img_list_path = Path(image_list_file)
+
+    img_list = json.load(open(img_list_path, 'r'))
+
+
+    sub_dirs = [dir for dir in img_list_path.parent.iterdir() if dir.is_dir()]
+
+    reconstructed = {}
+
+    for dir in sub_dirs:
+        if any(f.suffix == '.png' for f in dir.iterdir()):
+
+            if out_path and not Path(out_path, dir.name).exists():
+                Path(out_path, dir.name).mkdir(parents=True)
+            else:
+                reconstructed[dir.name] = []
+
+            for img_name, content in img_list.items():
+                print(dir.name + '/' + img_name)
+                origin = content['origin']
+                origin = (numpy.array(origin[0]), numpy.array(origin[1]))   # convert lists to tuple with ndarrays
+                patch_indices = content['indices']
+                img_shape = content['img_shape']
+
+                patches = []
+
+                for patch_index in patch_indices:
+                    patches.append(cv2.imread(str(Path(dir, str(patch_index) + '.png')), cv2.IMREAD_GRAYSCALE))
+
+                patches = numpy.array(patches)
+                img, weights = reconstruct_from_grayscale_patches(patches, tuple(origin))
+                img = img[:img_shape[0], :img_shape[1]].astype(numpy.uint8)     # crop to original shape
+
+                if out_path:
+                    io.imsave(Path(out_path, dir.name, img_name + '.png'), img)
+                else:
+                    reconstructed[dir.name].append(img)
+
+    if len(reconstructed) > 0:
+        return reconstructed
+    else:
+        return None
+
+if __name__ is '__main__':
+    reconstruct_from_img_list('/home/andreas/uni/thesis/src/output/out/image_list.json', out_path='/home/andreas/uni/thesis/src/output/reconstruction')

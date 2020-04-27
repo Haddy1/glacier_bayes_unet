@@ -7,7 +7,7 @@ import random
 
 def process_all(data_dir, out_dir, patch_size=256, preprocessor = None):
 
-    for d in ['test', 'val', 'train']:
+    for d in ['val', 'train']:
         process_data(Path(data_dir, d), Path(out_dir, d))
 
 
@@ -61,10 +61,9 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
         patch_meta_data = {}
         patch_meta_data['origin'] = [i_mask_zones[0].tolist(), i_mask_zones[1].tolist()]
         patch_meta_data['indices'] = patch_indices
+        patch_meta_data['img_shape'] = list(img.shape)
 
         img_patch_index[basename] = patch_meta_data
-
-
 
 
     with open(Path(out_dir, 'image_list.json'), 'w') as f:
@@ -79,12 +78,4 @@ def generate_subset(data_dir, out_dir, set_size, patch_size=256, preprocessor=No
 
 
 if __name__ == "__main__":
-    process_all('/home/andreas/uni/thesis/src/front_detection_dataset', '/home/andreas/uni/thesis/src/data_256')
-    generate_subset('/home/andreas/uni/thesis/src/front_detection_dataset/train', '/home/andreas/uni/thesis/src/data_256_small/train', 60)
-    generate_subset('/home/andreas/uni/thesis/src/front_detection_dataset/val', '/home/andreas/uni/thesis/src/data_256_small/val', 10)
-
-
-
-
-
-
+    process_all('/home/andreas/uni/thesis/src/front_detection_dataset', '/home/andreas/uni/thesis/src/data_512')
