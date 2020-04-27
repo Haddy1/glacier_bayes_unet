@@ -9,7 +9,7 @@ import json
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, EarlyStopping
 from scipy.spatial import distance
 
 from data import trainGenerator
@@ -17,6 +17,7 @@ from model import unet_Enze19_2
 import helper_functions
 from loss_functions import *
 from keras.losses import *  # Don't remove
+from shutil import copy
 
 #%% Hyper-parameter tuning
 parser = argparse.ArgumentParser(description='Glacier Front Segmentation')
@@ -29,7 +30,7 @@ parser.add_argument('--epochs', default=100, type=int, help='number of training 
 parser.add_argument('--batch_size', default=100, type=int, help='batch size (integer value)')
 parser.add_argument('--patch_size', default=256, type=int, help='batch size (integer value)')
 
-# parser.add_argument('--EARLY_STOPPING', default=1, type=int, help='If 1, classifier is using early stopping based on validation loss with patience 20 (0/1)')
+parser.add_argument('--EARLY_STOPPING', default=1, type=int, help='If 1, classifier is using early stopping based on validation loss with patience 20 (0/1)')
 parser.add_argument("--loss", help="loss function for the deep classifiers training ", choices=["binary_crossentropy", "focal_loss", "combined_loss"], default="binary_crossentropy")
 parser.add_argument('--loss_parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...", help='dictionary with parameters for loss function')
 
@@ -66,8 +67,14 @@ if not out_path.exists():
     out_path.mkdir(parents=True)
 
 # log all arguments including default ones
-with open(Path(out_path, 'arguments.txt'), 'w') as f:
+with open(Path(out_path, 'arguments.json'), 'w') as f:
     f.write(json.dumps(vars(args)))
+
+# copy image file list to output
+for d in data_path.iterdir():
+    if Path(d, 'image_list.json').exists():
+        copy(Path(d, 'image_list.json'), Path(out_path, d.name + '_image_list.json'))
+
 
 bin = binary_crossentropy
 if args.loss == "combined_loss":
@@ -109,6 +116,7 @@ else:
 #                    horizontal_flip=True,
 #                    fill_mode='nearest')
 data_gen_args = dict(horizontal_flip=True,
+                    rotation_range=90,
                     fill_mode='nearest')
 
 train_Generator = trainGenerator(batch_size = batch_size,
@@ -129,6 +137,7 @@ val_Generator = trainGenerator(batch_size = batch_size,
 
 model = unet_Enze19_2(loss_function=loss_function)
 model_checkpoint = ModelCheckpoint(str(Path(str(out_path), 'unet_zone.hdf5')), monitor='val_loss', verbose=0, save_best_only=True)
+early_stopping = EarlyStopping('val_loss', patience=20, verbose=0, mode='auto', restore_best_weights=True)
 
 
 steps_per_epoch = np.ceil(num_samples / batch_size)
@@ -138,7 +147,7 @@ History = model.fit_generator(train_Generator,
                     epochs=args.epochs,
                     validation_data=val_Generator,
                     validation_steps=validation_steps,
-                    callbacks=[model_checkpoint])
+                    callbacks=[model_checkpoint, early_stopping])
 #model.fit_generator(train_Generator, steps_per_epoch=300, epochs=1, callbacks=[model_checkpoint], class_weight=[0.0000001,0.9999999])
 
 ##########
@@ -206,55 +215,55 @@ for filename in Path(test_path,'images').rglob('*.png'):
 
     io.imsave(Path(str(out_path), Path(filename).name), img_mask_predicted_recons_unpad_norm)
 
-    mask_max = img_mask_predicted_recons_unpad_norm.max()
-    if mask_max > 0:
-        mask_predicted_norm = img_mask_predicted_recons_unpad_norm / img_mask_predicted_recons_unpad_norm.max()
-    else:
-        mask_predicted_norm = img_mask_predicted_recons_unpad_norm
-
-    mask_predicted_flat = mask_predicted_norm.flatten().astype(int)
-
-    gt_path = str(Path(test_path,'masks_zones'))
-    gt = io.imread(str(Path(gt_path,filename.name)), as_gray=True)
-
-    max = gt.max()
-    if max >0:
-        gt_norm = gt / gt.max()
-    else:
-        gt_norm = gt
-    gt_flat = gt_norm.flatten().astype(int)
-
-    Specificity_all.append(helper_functions.specificity(gt_flat, mask_predicted_flat))
-    Sensitivity_all.append(recall_score(gt_flat, mask_predicted_flat))
-    F1_all.append(f1_score(gt_flat, mask_predicted_flat))
-
-    # DICE
-    DICE_all.append(helper_functions.dice_coefficient(gt_flat, mask_predicted_flat))
-    EUCL_all.append(distance.euclidean(gt_flat, mask_predicted_flat))
-    test_file_names.append(filename.name)
-
-Perf['Specificity_all'] = Specificity_all
-Perf['Specificity_avg'] = np.mean(Specificity_all)
-Perf['Sensitivity_all'] = Sensitivity_all
-Perf['Sensitivity_avg'] = np.mean(Sensitivity_all)
-Perf['F1_score_all'] = F1_all
-Perf['F1_score_avg'] = np.mean(F1_all)
-Perf['DICE_all'] = DICE_all
-Perf['DICE_avg'] = np.mean(DICE_all)
-Perf['EUCL_all'] = EUCL_all
-Perf['EUCL_avg'] = np.mean(EUCL_all)
-Perf['test_file_names'] = test_file_names
-
-pickle.dump(Perf, open(Path(out_path, 'performance.pkl'), 'wb'))
-
-with open(str(Path(str(out_path) , 'ReportOnModel.txt')), 'w') as f:
-    f.write('Dice\tEuclidian\n')
-    f.write(str(Perf['DICE_avg']) + '\t'
-          + str(Perf['EUCL_avg']) + '\n')
-    f.write('Sensitivity\tSpecificitiy\tf1_score\n')
-    f.write(str(Perf['Sensitivity_avg']) + '\t'
-      + str(Perf['Specificity_avg']) + '\t'
-      + str(Perf['F1_score_avg']) + '\n')
+#    mask_max = img_mask_predicted_recons_unpad_norm.max()
+#    if mask_max > 0:
+#        mask_predicted_norm = img_mask_predicted_recons_unpad_norm / img_mask_predicted_recons_unpad_norm.max()
+#    else:
+#        mask_predicted_norm = img_mask_predicted_recons_unpad_norm
+#
+#    mask_predicted_flat = mask_predicted_norm.flatten().astype(int)
+#
+#    gt_path = str(Path(test_path,'masks_zones'))
+#    gt = io.imread(str(Path(gt_path,filename.name)), as_gray=True)
+#
+#    max = gt.max()
+#    if max >0:
+#        gt_norm = gt / gt.max()
+#    else:
+#        gt_norm = gt
+#    gt_flat = gt_norm.flatten().astype(int)
+#
+#    Specificity_all.append(helper_functions.specificity(gt_flat, mask_predicted_flat))
+#    Sensitivity_all.append(recall_score(gt_flat, mask_predicted_flat))
+#    F1_all.append(f1_score(gt_flat, mask_predicted_flat))
+#
+#    # DICE
+#    DICE_all.append(helper_functions.dice_coefficient(gt_flat, mask_predicted_flat))
+#    EUCL_all.append(distance.euclidean(gt_flat, mask_predicted_flat))
+#    test_file_names.append(filename.name)
+#
+#Perf['Specificity_all'] = Specificity_all
+#Perf['Specificity_avg'] = np.mean(Specificity_all)
+#Perf['Sensitivity_all'] = Sensitivity_all
+#Perf['Sensitivity_avg'] = np.mean(Sensitivity_all)
+#Perf['F1_score_all'] = F1_all
+#Perf['F1_score_avg'] = np.mean(F1_all)
+#Perf['DICE_all'] = DICE_all
+#Perf['DICE_avg'] = np.mean(DICE_all)
+#Perf['EUCL_all'] = EUCL_all
+#Perf['EUCL_avg'] = np.mean(EUCL_all)
+#Perf['test_file_names'] = test_file_names
+#
+#pickle.dump(Perf, open(Path(out_path, 'performance.pkl'), 'wb'))
+#
+#with open(str(Path(str(out_path) , 'ReportOnModel.txt')), 'w') as f:
+#    f.write('Dice\tEuclidian\n')
+#    f.write(str(Perf['DICE_avg']) + '\t'
+#          + str(Perf['EUCL_avg']) + '\n')
+#    f.write('Sensitivity\tSpecificitiy\tf1_score\n')
+#    f.write(str(Perf['Sensitivity_avg']) + '\t'
+#      + str(Perf['Specificity_avg']) + '\t'
+#      + str(Perf['F1_score_avg']) + '\n')
 
 END=time.time()
 print('Execution Time: ', END-START)

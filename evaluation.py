@@ -28,27 +28,29 @@ test_path="data_256/test"
 out_path = Path("output")
 
 #for predict_path in out_path.glob('result*'):
-predict_path = Path('data_256_bak/test/masks_predicted_200405-221056')
+predict_path = Path('output/combined_loss_0_0421-004910')
 for filename in Path(test_path,'images').rglob('*.png'):
     gt_path = str(Path(test_path,'masks_zones'))
     gt_name = filename.name.partition('.')[0] + '_zones.png'
     gt = io.imread(str(Path(gt_path,gt_name)), as_gray=True)
-    img_mask_predicted_recons_unpad_norm = io.imread(Path(predict_path,filename.name), as_gray=True)
+    pred = io.imread(Path(predict_path,filename.name), as_gray=True)
 
-    gt_bool = gt/gt.max()
-    gt_flat = gt_bool.flatten()
 
-    pred_bool = img_mask_predicted_recons_unpad_norm / img_mask_predicted_recons_unpad_norm.max()
-    mask_predicted_flat = pred_bool.flatten()
+    gt = (gt > 200).astype(int)
+    pred = (pred > 200).astype(int)
 
-    Specificity_all.append(helper_functions.specificity(gt_flat, mask_predicted_flat))
-    Sensitivity_all.append(recall_score(gt_flat, mask_predicted_flat))
-    F1_all.append(f1_score(gt_flat, mask_predicted_flat))
+    gt_flat = gt.flatten()
+
+    pred_flat = pred.flatten()
+
+    Specificity_all.append(helper_functions.specificity(gt_flat, pred_flat))
+    Sensitivity_all.append(recall_score(gt_flat, pred_flat))
+    F1_all.append(f1_score(gt_flat, pred_flat))
 
    # DICE_all.append(distance.dice(gt_bool.flatten(), pred_bool.flatten()))
-    DICE_all.append(distance.dice(gt_flat, mask_predicted_flat))
+    DICE_all.append(helper_functions.dice_coefficient(gt_flat, pred_flat))
     DICE_avg = np.mean(DICE_all)
-    EUCL_all.append(distance.euclidean(gt_flat, mask_predicted_flat))
+    EUCL_all.append(distance.euclidean(gt_flat, pred_flat))
     EUCL_avg = np.mean(EUCL_all)
     test_file_names.append(filename.name)
 
@@ -81,26 +83,4 @@ with open(str(Path(predict_path , 'ReportOnModel.txt')), 'w') as f:
     f.write(str(Perf['Sensitivity_avg']) + '\t'
             + str(Perf['Specificity_avg']) + '\t'
             + str(Perf['F1_score_avg']) + '\n')
-
-#%%
-#import imageio
-#path = Path("data_256/test/masks_predicted_focal-loss_alpha-1_gamma-0_200406-222725")
-#data = np.load(path.joinpath("Performance.npz"), allow_pickle=True)['arr_0']
-##test_file_names = data['test_file_names']
-#with open(path.joinpath("ReportOnModel.txt")) as f:
-#    print(f.read())
-#loss_plot = imageio.imread(path.joinpath("loss_plot.png"))
-#plt.imshow(loss_plot)
-#plt.show()
-
-#%%
-#import imageio
-#path = Path("data_256/test/masks_predicted_focal-loss_alpha-0.5_gamma-0.5_200407-005722")
-#data = np.load(path.joinpath("Performance.npz"), allow_pickle=True)['arr_0']
-##test_file_names = data['test_file_names']
-#with open(path.joinpath("ReportOnModel.txt")) as f:
-#    print(f.read())
-#loss_plot = imageio.imread(path.joinpath("loss_plot.png"))
-#plt.imshow(loss_plot)
-#plt.show()
 
