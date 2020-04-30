@@ -3,23 +3,22 @@ import time
 from pathlib import Path
 import pickle
 import json
-from shutil import copy
 
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 from keras.callbacks import ModelCheckpoint, EarlyStopping
-from scipy.spatial import distance
 import os
 
-from data import trainGenerator
+from utils.data import trainGenerator
 from model import unet_Enze19_2
 from utils import helper_functions
 from loss_functions import *
 from keras.losses import *  # Don't remove
 from shutil import copy
+import tensorflow as tf
 
-#%% Hyper-parameter tuning
+#Hyper-parameter tuning
 parser = argparse.ArgumentParser(description='Glacier Front Segmentation')
 
 parser.add_argument('--epochs', default=100, type=int, help='number of training epochs (integer value > 0)')
@@ -30,21 +29,29 @@ parser.add_argument('--EARLY_STOPPING', default=1, type=int, help='If 1, classif
 parser.add_argument("--loss", help="loss function for the deep classifiers training ", choices=["binary_crossentropy", "focal_loss", "combined_loss"], default="binary_crossentropy")
 parser.add_argument('--loss_parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...", help='dictionary with parameters for loss function')
 parser.add_argument('--image_aug', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...",
-                    help='dictionary with the augmentation for keras Image Processing', default={'horizontal_flip':True,'rotation_range':90, 'fill_mode':nearest})
+                    help='dictionary with the augmentation for keras Image Processing', default={'horizontal_flip':False,'rotation_range':0, 'fill_mode':'nearest'})
 
 parser.add_argument('--out', type=str, help='Output path for results')
 parser.add_argument('--data_path', type=str, help='Path containing training and validation data')
+parser.add_argument('--debug', action='store_true')
 
 # parser.add_argument('--Random_Seed', default=1, type=int, help='random seed number value (any integer value)')
 
 args = parser.parse_args()
 
-#%%
 START=time.time()
 
 PATCH_SIZE = args.patch_size
 batch_size = args.batch_size
 
+if args.debug:
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+
+    # Currently, memory growth needs to be the same across GPUs
+    for gpu in gpus:
+        tf.config.experimental.set_memory_growth(gpu, True)
+
+    tf.config.experimental.set_virtual_device_configuration(gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=4096)])
 
 if args.data_path:
     data_path = Path(args.data_path)
@@ -158,25 +165,20 @@ plt.show()
 
 # # save model
 model.save(str(Path(out_path,'model_' + model.name + '.h5').absolute()))
-pickle.dumps(open(Path(out_path, 'loss_function' + model.name + '.pkl'), 'w'), loss_function)
+pickle.dump(loss_function, open(Path(out_path, 'loss_function' + model.name + '.pkl'), 'wb'))
 
 # Don"t need checkpoint model anymore
 os.remove(Path(str(out_path), 'unet_zone.hdf5'))
 
-##########
-##########
-
-#%%
-# testGene = testGenerator('data_256/test/images', num_image=5) #########
-# results = model.predict_generator(testGene, 5, verbose=0) #########
-# saveResult_Amir('data_256/test/masks_predicted', results) #########
 
 #####################
 #####################
 import skimage.io as io
 import Amir_utils
+from utils.evaluate import  evaluate
 from pathlib import Path
-from sklearn.metrics import f1_score, recall_score
+from preprocessing.image_patches import extract_grayscale_patches, reconstruct_from_grayscale_patches
+
 test_path = str(Path(data_path,'test'))
 
 if not out_path:
@@ -197,73 +199,26 @@ for filename in Path(test_path,'images').rglob('*.png'):
     img = io.imread(filename, as_gray=True)
     img = img / 255
     img_pad = cv2.copyMakeBorder(img, 0, (PATCH_SIZE-img.shape[0]) % PATCH_SIZE, 0, (PATCH_SIZE-img.shape[1]) % PATCH_SIZE, cv2.BORDER_CONSTANT)
-    p_img, i_img = Amir_utils.extract_grayscale_patches(img_pad, (PATCH_SIZE,PATCH_SIZE), stride = (PATCH_SIZE,PATCH_SIZE))
+    p_img, i_img = extract_grayscale_patches(img_pad, (PATCH_SIZE,PATCH_SIZE), stride = (PATCH_SIZE,PATCH_SIZE))
     p_img = np.reshape(p_img,p_img.shape+(1,))
 
     p_img_predicted = model.predict(p_img)
 
     p_img_predicted = np.reshape(p_img_predicted,p_img_predicted.shape[:-1])
-    img_mask_predicted_recons = Amir_utils.reconstruct_from_grayscale_patches(p_img_predicted,i_img)[0]
+    mask_predicted = reconstruct_from_grayscale_patches(p_img_predicted,i_img)[0]
+    mask_predicted = mask_predicted[:img.shape[0], :img.shape[1]]
 
-    # unpad and normalize
-    img_mask_predicted_recons_unpad = img_mask_predicted_recons[0:img.shape[0],0:img.shape[1]]
-    img_mask_predicted_recons_unpad_norm = cv2.normalize(src=img_mask_predicted_recons_unpad, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+    # to 8 bit image
+    mask_predicted = cv2.normalize(src=mask_predicted, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
 
     # quantization to make the binary masks
-    img_mask_predicted_recons_unpad_norm[img_mask_predicted_recons_unpad_norm < 127] = 0
-    img_mask_predicted_recons_unpad_norm[img_mask_predicted_recons_unpad_norm >= 127] = 255
+    mask_predicted[mask_predicted < 127] = 0
+    mask_predicted[mask_predicted >= 127] = 255
 
-    io.imsave(Path(str(out_path), Path(filename).name), img_mask_predicted_recons_unpad_norm)
+    io.imsave(Path(str(out_path), Path(filename).name), mask_predicted)
 
-#    mask_max = img_mask_predicted_recons_unpad_norm.max()
-#    if mask_max > 0:
-#        mask_predicted_norm = img_mask_predicted_recons_unpad_norm / img_mask_predicted_recons_unpad_norm.max()
-#    else:
-#        mask_predicted_norm = img_mask_predicted_recons_unpad_norm
-#
-#    mask_predicted_flat = mask_predicted_norm.flatten().astype(int)
-#
-#    gt_path = str(Path(test_path,'masks_zones'))
-#    gt = io.imread(str(Path(gt_path,filename.name)), as_gray=True)
-#
-#    max = gt.max()
-#    if max >0:
-#        gt_norm = gt / gt.max()
-#    else:
-#        gt_norm = gt
-#    gt_flat = gt_norm.flatten().astype(int)
-#
-#    Specificity_all.append(helper_functions.specificity(gt_flat, mask_predicted_flat))
-#    Sensitivity_all.append(recall_score(gt_flat, mask_predicted_flat))
-#    F1_all.append(f1_score(gt_flat, mask_predicted_flat))
-#
-#    # DICE
-#    DICE_all.append(helper_functions.dice_coefficient(gt_flat, mask_predicted_flat))
-#    EUCL_all.append(distance.euclidean(gt_flat, mask_predicted_flat))
-#    test_file_names.append(filename.name)
-#
-#Perf['Specificity_all'] = Specificity_all
-#Perf['Specificity_avg'] = np.mean(Specificity_all)
-#Perf['Sensitivity_all'] = Sensitivity_all
-#Perf['Sensitivity_avg'] = np.mean(Sensitivity_all)
-#Perf['F1_score_all'] = F1_all
-#Perf['F1_score_avg'] = np.mean(F1_all)
-#Perf['DICE_all'] = DICE_all
-#Perf['DICE_avg'] = np.mean(DICE_all)
-#Perf['EUCL_all'] = EUCL_all
-#Perf['EUCL_avg'] = np.mean(EUCL_all)
-#Perf['test_file_names'] = test_file_names
-#
-#pickle.dump(Perf, open(Path(out_path, 'performance.pkl'), 'wb'))
-#
-#with open(str(Path(str(out_path) , 'ReportOnModel.txt')), 'w') as f:
-#    f.write('Dice\tEuclidian\n')
-#    f.write(str(Perf['DICE_avg']) + '\t'
-#          + str(Perf['EUCL_avg']) + '\n')
-#    f.write('Sensitivity\tSpecificitiy\tf1_score\n')
-#    f.write(str(Perf['Sensitivity_avg']) + '\t'
-#      + str(Perf['Specificity_avg']) + '\t'
-#      + str(Perf['F1_score_avg']) + '\n')
+evaluate(test_path, out_path)
+
 
 END=time.time()
 print('Execution Time: ', END-START)
