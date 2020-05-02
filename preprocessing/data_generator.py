@@ -4,6 +4,7 @@ import cv2
 from preprocessing import image_patches
 import json
 import random
+import shutil
 
 def process_all(data_dir, out_dir, patch_size=256, preprocessor = None):
 
@@ -78,4 +79,13 @@ def generate_subset(data_dir, out_dir, set_size, patch_size=256, preprocessor=No
 
 
 if __name__ == "__main__":
-    process_all('/home/andreas/uni/thesis/src/front_detection_dataset', '/home/andreas/uni/thesis/src/data_512')
+    random.seed(42)
+    patch_size = 512
+
+    out_dir = Path('/home/andreas/thesis/src/data_' + str(patch_size))
+    data_dir = Path('/home/andreas/thesis/src/front_detection_dataset')
+
+    shutil.copytree(Path(data_dir, 'test'), Path(out_dir, 'test'))
+
+    process_data(Path(data_dir, 'train'), Path(out_dir, 'train'), patch_size=patch_size)
+    process_data(Path(data_dir, 'val'), Path(out_dir, 'val'), patch_size=patch_size)

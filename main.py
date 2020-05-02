@@ -15,8 +15,10 @@ from model import unet_Enze19_2
 from utils import helper_functions
 from loss_functions import *
 from keras.losses import *  # Don't remove
-from shutil import copy
+from shutil import copy, rmtree
 import tensorflow as tf
+from preprocessing.preprocessor import Preprocessor
+from preprocessing import data_generator, filter
 
 #Hyper-parameter tuning
 parser = argparse.ArgumentParser(description='Glacier Front Segmentation')
@@ -30,6 +32,10 @@ parser.add_argument("--loss", help="loss function for the deep classifiers train
 parser.add_argument('--loss_parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...", help='dictionary with parameters for loss function')
 parser.add_argument('--image_aug', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...",
                     help='dictionary with the augmentation for keras Image Processing', default={'horizontal_flip':False,'rotation_range':0, 'fill_mode':'nearest'})
+parser.add_argument("--denoise", help="Denoise filter", choices=["none", "bilateral", "median", 'nlmeans', "bm3d", "improved_lee", "kuan"], default="None")
+parser.add_argument('--denoise_parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...", help='dictionary with parameters for denoise filter')
+parser.add_argument("--contrast", help="Contrast Enhancement", action='store_true')
+parser.add_argument("--image_patches", help="Training data is already split into image patches", action='store_true')
 
 parser.add_argument('--out', type=str, help='Output path for results')
 parser.add_argument('--data_path', type=str, help='Path containing training and validation data')
@@ -41,7 +47,7 @@ args = parser.parse_args()
 
 START=time.time()
 
-PATCH_SIZE = args.patch_size
+patch_size = args.patch_size
 batch_size = args.batch_size
 
 if args.debug:
@@ -58,14 +64,19 @@ if args.data_path:
 else:
     data_path = Path('data')
 
+
 num_samples = len([file for file in Path(data_path, 'train/images').rglob('*.png')]) # number of training samples
 num_val_samples = len([file for file in Path(data_path, 'val/images').rglob('*.png')]) # number of validation samples
 
 if args.out:
     out_path = Path(args.out)
 else:
-    out_path = Path('data_' + str(PATCH_SIZE) + '/test/masks_predicted_' + time.strftime("%y%m%d-%H%M%S"))
+    out_path = Path('data_' + str(patch_size) + '/test/masks_predicted_' + time.strftime("%y%m%d-%H%M%S"))
 
+if args.image_patches:
+    patches_path = data_path
+else:
+    patches_path = Path(out_path, 'patches')
 
 
 if not out_path.exists():
@@ -75,10 +86,34 @@ if not out_path.exists():
 with open(Path(out_path, 'arguments.json'), 'w') as f:
     f.write(json.dumps(vars(args)))
 
+# Preprocessing
+preprocessor = Preprocessor()
+denoise = args.denoise.lower()
+if denoise is 'bilateral':
+    if args.denoise_parm:
+        preprocessor.add_filter(lambda  img:cv2.bilateralFilter(img, args.denoise_parm))
+    else:
+        preprocessor.add_filter(lambda img:cv2.bilateralFilter(img, 20, 80, 80))
+elif denoise is 'median':
+    preprocessor.add_filter(lambda img: cv2.medianBlur(img, 5))
+elif denoise is 'nlmeans':
+    preprocessor.add_filter(cv2.fastNlMeansDenoising)
+#elif denoise is 'bm3d':
+
+if args.contrast:
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(25, 25))  # CLAHE adaptive contrast enhancement
+    preprocessor.add_filter(clahe.apply)
+
+if not args.image_patches:
+    data_generator.process_data(Path(data_path, 'train'), Path(patches_path, 'train'), patch_size=patch_size, preprocessor = preprocessor)
+    data_generator.process_data(Path(data_path, 'val'), Path(patches_path, 'val'), patch_size=patch_size, preprocessor = preprocessor)
+
 # copy image file list to output
-for d in data_path.iterdir():
+for d in patches_path.iterdir():
     if Path(d, 'image_list.json').exists():
         copy(Path(d, 'image_list.json'), Path(out_path, d.name + '_image_list.json'))
+
+
 
 
 bin = binary_crossentropy
@@ -118,14 +153,14 @@ data_gen_args = dict(horizontal_flip=True,
                     fill_mode='nearest')
 
 train_Generator = trainGenerator(batch_size = batch_size,
-                        train_path = str(Path(data_path, 'train')),
+                        train_path = str(Path(patches_path, 'train')),
                         image_folder = 'images',
                         mask_folder = 'masks_zones',
                         aug_dict = args.image_aug,
                         save_to_dir = None)
 
 val_Generator = trainGenerator(batch_size = batch_size,
-                        train_path = str(Path(data_path, 'val')),
+                        train_path = str(Path(patches_path, 'val')),
                         image_folder = 'images',
                         mask_folder = 'masks_zones',
                         aug_dict = None,
@@ -136,6 +171,7 @@ val_Generator = trainGenerator(batch_size = batch_size,
 model = unet_Enze19_2(loss_function=loss_function)
 model_checkpoint = ModelCheckpoint(str(Path(str(out_path), 'unet_zone.hdf5')), monitor='val_loss', verbose=0, save_best_only=True)
 early_stopping = EarlyStopping('val_loss', patience=20, verbose=0, mode='auto', restore_best_weights=True)
+
 
 
 steps_per_epoch = np.ceil(num_samples / batch_size)
@@ -167,8 +203,10 @@ plt.show()
 model.save(str(Path(out_path,'model_' + model.name + '.h5').absolute()))
 pickle.dump(loss_function, open(Path(out_path, 'loss_function' + model.name + '.pkl'), 'wb'))
 
-# Don"t need checkpoint model anymore
+# Cleanup
 os.remove(Path(str(out_path), 'unet_zone.hdf5'))
+if Path(out_path, 'patches').exists():
+    rmtree(Path(out_path, 'patches'))
 
 
 #####################
@@ -198,8 +236,8 @@ img_list = None
 for filename in Path(test_path,'images').rglob('*.png'):
     img = io.imread(filename, as_gray=True)
     img = img / 255
-    img_pad = cv2.copyMakeBorder(img, 0, (PATCH_SIZE-img.shape[0]) % PATCH_SIZE, 0, (PATCH_SIZE-img.shape[1]) % PATCH_SIZE, cv2.BORDER_CONSTANT)
-    p_img, i_img = extract_grayscale_patches(img_pad, (PATCH_SIZE,PATCH_SIZE), stride = (PATCH_SIZE,PATCH_SIZE))
+    img_pad = cv2.copyMakeBorder(img, 0, (patch_size - img.shape[0]) % patch_size, 0, (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
+    p_img, i_img = extract_grayscale_patches(img_pad, (patch_size, patch_size), stride = (patch_size, patch_size))
     p_img = np.reshape(p_img,p_img.shape+(1,))
 
     p_img_predicted = model.predict(p_img)
