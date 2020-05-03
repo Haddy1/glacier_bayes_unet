@@ -32,11 +32,17 @@ def specificity(y_true, y_pred):
 
 
 class StoreDictKeyPair(argparse.Action):
-     def __call__(self, parser, namespace, values, option_string=None):
-         my_dict = {}
-         for kv in values.split(","):
-             k,v = kv.split("=")
-             my_dict[k] = float(v)
-         setattr(namespace, self.dest, my_dict)
+    def __call__(self, parser, namespace, values, option_string=None):
+        my_dict = {}
+        for kv in values.split(","):
+            k,v = kv.split("=")
+            try:
+                my_dict[k] = int(v)
+            except ValueError:
+                try:
+                    my_dict[k] = float(v)
+                except ValueError:
+                    my_dict[k] = v
+        setattr(namespace, self.dest, my_dict)
 
 

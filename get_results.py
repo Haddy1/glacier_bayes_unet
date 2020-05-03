@@ -19,14 +19,12 @@ for dir in dirs:
           content = f.readlines()
     content = [x.strip() for x in content]
 
-    standard = content[3].split()
-    results['Sensitivity'] = standard[0]
-    results['Specificity'] = standard[1]
-    results['f1_score'] = standard[2]
+    scores = content[1].split()
+    results['Sensitivity'] = str(round(100 * float(scores[0]), 2))
+    results['Specificity'] = str(round(100 * float(scores[1]), 2))
+    results['Dice'] = str(round(100 * float(scores[2]), 2))
+    results['Eucl'] = scores[3]
 
-    dice_eucl = content[1].split()
-    results['Dice'] = dice_eucl[0]
-    results['Eucl'] = dice_eucl[1]
 
     arguments = json.load(open(Path(dir, 'arguments.json'), 'r'))
     loss_split = arguments['loss_parms']
@@ -36,12 +34,11 @@ for dir in dirs:
     copy(Path(dir, 'loss_plot.png'), Path(out, 'loss' + split + '.png'))
 
 with open(Path(out,'results.tex'), 'w') as f:
-    f.write('& Sensitivity & Specificity & f1_score & Dice & Eucl \\\\\n')
-    for split, results in all_results.items():
+    f.write('& Sensitivity & Specificity & Dice & Eucl \\\\\n')
+    for split, results in sorted(all_results.items(), reverse=True):
         line = split
         line += ' & ' + results['Sensitivity']
         line += ' & ' + results['Specificity']
-        line += ' & ' + results['f1_score']
         line += ' & ' + results['Dice']
         line += ' & ' + results['Eucl'] + " \\\\\n"
         f.write(line)

@@ -31,11 +31,11 @@ parser.add_argument('--EARLY_STOPPING', default=1, type=int, help='If 1, classif
 parser.add_argument("--loss", help="loss function for the deep classifiers training ", choices=["binary_crossentropy", "focal_loss", "combined_loss"], default="binary_crossentropy")
 parser.add_argument('--loss_parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...", help='dictionary with parameters for loss function')
 parser.add_argument('--image_aug', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...",
-                    help='dictionary with the augmentation for keras Image Processing', default={'horizontal_flip':False,'rotation_range':0, 'fill_mode':'nearest'})
+                    help='dictionary with the augmentation for keras Image Processing', default={'horizontal_flip':True,'rotation_range':90, 'fill_mode':'nearest'})
 parser.add_argument("--denoise", help="Denoise filter", choices=["none", "bilateral", "median", 'nlmeans', "bm3d", "improved_lee", "kuan"], default="None")
 parser.add_argument('--denoise_parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...", help='dictionary with parameters for denoise filter')
-parser.add_argument("--contrast", help="Contrast Enhancement", action='store_true')
-parser.add_argument("--image_patches", help="Training data is already split into image patches", action='store_true')
+parser.add_argument('--contrast', default=0, type=int, help='Contrast Enhancement')
+parser.add_argument('--image_patches', default=0, type=int, help='Training data is already split into image patches')
 
 parser.add_argument('--out', type=str, help='Output path for results')
 parser.add_argument('--data_path', type=str, help='Path containing training and validation data')
@@ -50,6 +50,7 @@ START=time.time()
 patch_size = args.patch_size
 batch_size = args.batch_size
 
+
 if args.debug:
     gpus = tf.config.experimental.list_physical_devices('GPU')
 
@@ -57,7 +58,7 @@ if args.debug:
     for gpu in gpus:
         tf.config.experimental.set_memory_growth(gpu, True)
 
-    tf.config.experimental.set_virtual_device_configuration(gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=4096)])
+    #tf.config.experimental.set_virtual_device_configuration(gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=4096)])
 
 if args.data_path:
     data_path = Path(args.data_path)
@@ -89,16 +90,26 @@ with open(Path(out_path, 'arguments.json'), 'w') as f:
 # Preprocessing
 preprocessor = Preprocessor()
 denoise = args.denoise.lower()
-if denoise is 'bilateral':
-    if args.denoise_parm:
-        preprocessor.add_filter(lambda  img:cv2.bilateralFilter(img, args.denoise_parm))
+if denoise == 'bilateral':
+    if args.denoise_parms:
+        preprocessor.add_filter(lambda  img:cv2.bilateralFilter(img, **args.denoise_parms))
     else:
         preprocessor.add_filter(lambda img:cv2.bilateralFilter(img, 20, 80, 80))
-elif denoise is 'median':
-    preprocessor.add_filter(lambda img: cv2.medianBlur(img, 5))
-elif denoise is 'nlmeans':
-    preprocessor.add_filter(cv2.fastNlMeansDenoising)
-#elif denoise is 'bm3d':
+elif denoise == 'median':
+    if args.denoise_parms:
+        preprocessor.add_filter(lambda img: cv2.medianBlur(img, **args.denoise_parms))
+    else:
+        preprocessor.add_filter(lambda img: cv2.medianBlur(img, 5))
+elif denoise == 'nlmeans':
+    if args.denoise_parms:
+        preprocessor.add_filter(lambda img: cv2.fastNlMeansDenoising(img, None, **args.denoise_parms))
+    else:
+        preprocessor.add_filter(lambda img: cv2.fastNlMeansDenoising(img, None))
+elif denoise == 'kuan':
+    preprocessor.add_filter(lambda img: filter.kuan(img))
+elif denoise == 'enhanced_lee':
+    preprocessor.add_filter(lambda img: filter.enhanced_lee(img))
+
 
 if args.contrast:
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(25, 25))  # CLAHE adaptive contrast enhancement
@@ -116,7 +127,6 @@ for d in patches_path.iterdir():
 
 
 
-bin = binary_crossentropy
 if args.loss == "combined_loss":
     if not args.loss_parms:
         print("combined_loss needs loss functions as parameter")
@@ -201,7 +211,7 @@ plt.show()
 
 # # save model
 model.save(str(Path(out_path,'model_' + model.name + '.h5').absolute()))
-pickle.dump(loss_function, open(Path(out_path, 'loss_function' + model.name + '.pkl'), 'wb'))
+pickle.dump(loss_function, open(Path(out_path, 'loss_function_' + model.name + '.pkl'), 'wb'))
 
 # Cleanup
 os.remove(Path(str(out_path), 'unet_zone.hdf5'))
