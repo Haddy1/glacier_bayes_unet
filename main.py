@@ -14,7 +14,7 @@ from utils.data import trainGenerator
 from model import unet_Enze19_2
 from utils import helper_functions
 from loss_functions import *
-from keras.losses import *  # Don't remove
+from keras.losses import *
 from shutil import copy, rmtree
 import tensorflow as tf
 from preprocessing.preprocessor import Preprocessor
@@ -32,12 +32,12 @@ parser.add_argument("--loss", help="loss function for the deep classifiers train
 parser.add_argument('--loss_parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...", help='dictionary with parameters for loss function')
 parser.add_argument('--image_aug', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...",
                     help='dictionary with the augmentation for keras Image Processing', default={'horizontal_flip':True,'rotation_range':90, 'fill_mode':'nearest'})
-parser.add_argument("--denoise", help="Denoise filter", choices=["none", "bilateral", "median", 'nlmeans', "bm3d", "improved_lee", "kuan"], default="None")
+parser.add_argument("--denoise", help="Denoise filter", choices=["none", "bilateral", "median", 'nlmeans', "bm3d", "enhanced_lee", "kuan"], default="None")
 parser.add_argument('--denoise_parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...", help='dictionary with parameters for denoise filter')
 parser.add_argument('--contrast', default=0, type=int, help='Contrast Enhancement')
 parser.add_argument('--image_patches', default=0, type=int, help='Training data is already split into image patches')
 
-parser.add_argument('--out', type=str, help='Output path for results')
+parser.add_argument('--out_path', type=str, help='Output path for results')
 parser.add_argument('--data_path', type=str, help='Path containing training and validation data')
 parser.add_argument('--debug', action='store_true')
 
@@ -69,8 +69,8 @@ else:
 num_samples = len([file for file in Path(data_path, 'train/images').rglob('*.png')]) # number of training samples
 num_val_samples = len([file for file in Path(data_path, 'val/images').rglob('*.png')]) # number of validation samples
 
-if args.out:
-    out_path = Path(args.out)
+if args.out_path:
+    out_path = Path(args.out_path)
 else:
     out_path = Path('data_' + str(patch_size) + '/test/masks_predicted_' + time.strftime("%y%m%d-%H%M%S"))
 
@@ -92,9 +92,9 @@ preprocessor = Preprocessor()
 denoise = args.denoise.lower()
 if denoise == 'bilateral':
     if args.denoise_parms:
-        preprocessor.add_filter(lambda  img:cv2.bilateralFilter(img, **args.denoise_parms))
+        preprocessor.add_filter(lambda  img:cv2.bilateralFilter(img, None,**args.denoise_parms))
     else:
-        preprocessor.add_filter(lambda img:cv2.bilateralFilter(img, 20, 80, 80))
+        preprocessor.add_filter(lambda img:cv2.bilateralFilter(img, None,20, 80, 80))
 elif denoise == 'median':
     if args.denoise_parms:
         preprocessor.add_filter(lambda img: cv2.medianBlur(img, **args.denoise_parms))
@@ -154,6 +154,8 @@ elif args.loss == 'focal_loss':
         #loss_function = locals()[args.LOSS](alpha=args.alpha, gamma=args.gamma)
     else:
         loss_function = locals()[args.loss]()
+elif args.loss == 'binary_crossentropy':
+    loss_function = binary_crossentropy
 else:
     loss_function = locals()[args.loss]
 
@@ -211,7 +213,6 @@ plt.show()
 
 # # save model
 model.save(str(Path(out_path,'model_' + model.name + '.h5').absolute()))
-pickle.dump(loss_function, open(Path(out_path, 'loss_function_' + model.name + '.pkl'), 'wb'))
 
 # Cleanup
 os.remove(Path(str(out_path), 'unet_zone.hdf5'))
