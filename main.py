@@ -19,6 +19,7 @@ from shutil import copy, rmtree
 import tensorflow as tf
 from preprocessing.preprocessor import Preprocessor
 from preprocessing import data_generator, filter
+import bm3d
 
 #Hyper-parameter tuning
 parser = argparse.ArgumentParser(description='Glacier Front Segmentation')
@@ -105,6 +106,11 @@ elif denoise == 'nlmeans':
         preprocessor.add_filter(lambda img: cv2.fastNlMeansDenoising(img, None, **args.denoise_parms))
     else:
         preprocessor.add_filter(lambda img: cv2.fastNlMeansDenoising(img, None))
+elif denoise == 'bm3d':
+    if args.denoise_parms:
+        preprocessor.add_filter(lambda img: bm3d(img, **args.denoise_parms))
+    else:
+        preprocessor.add_filter(lambda img: bm3d.bm3d(img, sigma_psd=30))
 elif denoise == 'kuan':
     preprocessor.add_filter(lambda img: filter.kuan(img))
 elif denoise == 'enhanced_lee':

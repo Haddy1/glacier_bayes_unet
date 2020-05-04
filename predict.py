@@ -67,7 +67,7 @@ else:
     loss_function = locals()[options['loss']]
 
 
-model = load_model(model_file, custom_objects={ 'loss': loss_function})
+model = load_model(str(model_file.absolute()), custom_objects={ 'loss': loss_function})
 
 
 out_path = Path(args.out_path)
