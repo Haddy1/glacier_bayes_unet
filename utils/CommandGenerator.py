@@ -3,18 +3,18 @@ import numpy as np
 
 program = 'python3 main.py'
 nr_parallel_cmds = 3    # nr of scripts generated
-out_path = 'output'     # where results should be written to
+out_path = 'output_combined'     # where results should be written to
 identifier = 'combined_loss'
-patch_size = 256
 arguments = {
     'loss': 'combined_loss',
     'loss_parms' : {
-        'binary_crossentropy':[1.0,0.8,0.6,0.4,0.2,0.0],
-        'focal_loss': [0.0,0.2,0.4,0.6,0.8,1.0]
+        'binary_crossentropy':[1.0,0.8,0.6, 0.5,0.4,0.2,0.0],
+        'focal_loss': [0.0,0.2,0.4, 0.5,0.6,0.8,1.0]
     },
     'batch_size':16,
     'patch_size':256,
-    'data_path': 'data_256'
+    'data_path': 'data_256',
+    'image_patches': 1
 }
 
 # Don't change anything below this line
@@ -69,7 +69,7 @@ for arg, value in arguments.items():
     cmds = addArgument(cmds, arg, value)
 
 
-# Write bash script file for each job
+# Write sbatch script file for each job
 
 
 # indices evenly distributing commands among jobs
