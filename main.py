@@ -23,7 +23,8 @@ from preprocessing import data_generator, filter
 #Hyper-parameter tuning
 parser = argparse.ArgumentParser(description='Glacier Front Segmentation')
 
-parser.add_argument('--epochs', default=100, type=int, help='number of training epochs (integer value > 0)')
+parser.add_argument('--epochs', default=250, type=int, help='number of training epochs (integer value > 0)')
+parser.add_argument('--patience', default=30, type=int, help='how long to wait for improvements before Early_stopping')
 parser.add_argument('--batch_size', default=100, type=int, help='batch size (integer value)')
 parser.add_argument('--patch_size', default=256, type=int, help='batch size (integer value)')
 
@@ -175,7 +176,7 @@ val_Generator = trainGenerator(batch_size = batch_size,
 
 model = unet_Enze19_2(loss_function=loss_function, input_size=(patch_size,patch_size, 1))
 model_checkpoint = ModelCheckpoint(str(Path(str(out_path), 'unet_zone.hdf5')), monitor='val_loss', verbose=0, save_best_only=True)
-early_stopping = EarlyStopping('val_loss', patience=20, verbose=0, mode='auto', restore_best_weights=True)
+early_stopping = EarlyStopping('val_loss', patience=args.patience, verbose=0, mode='auto', restore_best_weights=True)
 
 
 num_samples = len([file for file in Path(patches_path, 'train/images').rglob('*.png')]) # number of training samples
