@@ -20,27 +20,32 @@ for dir in dirs:
     content = [x.strip() for x in content]
 
     scores = content[1].split()
-    results['Sensitivity'] = str(round(100 * float(scores[0]), 2))
-    results['Specificity'] = str(round(100 * float(scores[1]), 2))
-    results['Dice'] = str(round(100 * float(scores[2]), 2))
-    results['Eucl'] = scores[3]
+    results['Dice'] = str(round(100 * float(scores[0]), 2))
+    results['IOU'] = str(round(100 * float(scores[1]), 2))
+    results['Eucl'] = scores[2]
+    results['Sensitivity'] = str(round(100 * float(scores[3]), 2))
+    results['Specificity'] = str(round(100 * float(scores[4]), 2))
 
 
     arguments = json.load(open(Path(dir, 'arguments.json'), 'r'))
-    loss_split = arguments['loss_parms']
-    split = str(loss_split['binary_crossentropy']) + '_' + str(loss_split['focal_loss'])
-    all_results[split] = results
+    #loss_split = arguments['loss_parms']
+    #split = str(loss_split['binary_crossentropy']) + '_' + str(loss_split['focal_loss'])
+    #all_results[split] = results
+    denoise_filter = arguments['denoise']
+    all_results[denoise_filter] = results
 
-    copy(Path(dir, 'loss_plot.png'), Path(out, 'loss' + split + '.png'))
+    #copy(Path(dir, 'loss_plot.png'), Path(out, 'loss' + split + '.png'))
+    copy(Path(dir, 'loss_plot.png'), Path(out, 'loss' + denoise_filter + '.png'))
 
 with open(Path(out,'results.tex'), 'w') as f:
-    f.write('& Sensitivity & Specificity & Dice & Eucl \\\\\n')
+    f.write('& Dice & IOU & Eucl & Sensitivity & Specificity\\\\\n')
     for split, results in sorted(all_results.items(), reverse=True):
         line = split
-        line += ' & ' + results['Sensitivity']
-        line += ' & ' + results['Specificity']
         line += ' & ' + results['Dice']
-        line += ' & ' + results['Eucl'] + " \\\\\n"
+        line += ' & ' + results['IOU']
+        line += ' & ' + results['Eucl']
+        line += ' & ' + results['Sensitivity']
+        line += ' & ' + results['Specificity'] + " \\\\\n"
         f.write(line)
 
 

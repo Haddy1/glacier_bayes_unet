@@ -4,10 +4,13 @@ from scipy.spatial import distance
 import numpy as np
 from sklearn.metrics import f1_score, recall_score
 from utils import helper_functions
+from matplotlib import pyplot as plt
+import json
 
 def evaluate(test_path, prediction_path):
     DICE_all = []
     EUCL_all = []
+    IOU_all = []
     Specificity_all =[]
     Sensitivity_all = []
     test_file_names = []
@@ -33,6 +36,7 @@ def evaluate(test_path, prediction_path):
         DICE_avg = np.mean(DICE_all)
         EUCL_all.append(distance.euclidean(gt_flat, pred_flat))
         EUCL_avg = np.mean(EUCL_all)
+        IOU_all.append(helper_functions.IOU(gt_flat, pred_flat))
         test_file_names.append(filename.name)
 
 
@@ -42,19 +46,30 @@ def evaluate(test_path, prediction_path):
     Perf['Sensitivity_avg'] = np.mean(Sensitivity_all)
     Perf['DICE_all'] = DICE_all
     Perf['DICE_avg'] = DICE_avg
+    Perf['IOU_all'] = IOU_all
+    Perf['IOU_avg'] = np.mean(IOU_all)
     Perf['EUCL_all'] = EUCL_all
     Perf['EUCL_avg'] = EUCL_avg
     Perf['test_file_names'] = test_file_names
     print(prediction_path)
-    print('Sensitivity\tSpecificitiy\tDice\tEuclidian')
-    print(str(Perf['Sensitivity_avg']) + '\t'
-            + str(Perf['Specificity_avg']) + '\t'
-            + str(Perf['DICE_avg']) + '\t'
-            + str(Perf['EUCL_avg']) + '\n')
+    print('Dice\tIOU\tEucl\tSensitivity\tSpecificitiy')
+    print(
+                  str(Perf['DICE_avg']) + '\t'
+                  + str(Perf['IOU_avg']) + '\t'
+                  + str(Perf['EUCL_avg']) + '\t'
+                  + str(Perf['Sensitivity_avg']) + '\t'
+            + str(Perf['Specificity_avg']) + '\n')
 
     with open(str(Path(prediction_path, 'ReportOnModel.txt')), 'w') as f:
-        f.write('Sensitivity\tSpecificitiy\tDice\tEuclidian\n')
-        f.write(str(Perf['Sensitivity_avg']) + '\t'
-                + str(Perf['Specificity_avg']) + '\t'
-                + str(Perf['DICE_avg']) + '\t'
-                + str(Perf['EUCL_avg']) + '\n')
+        f.write('Dice\tIOU\tEucl\tSensitivity\tSpecificitiy\n')
+        f.write(
+                str(Perf['DICE_avg']) + '\t'
+                + str(Perf['IOU_avg']) + '\t'
+                + str(Perf['EUCL_avg']) + '\t'
+                + str(Perf['Sensitivity_avg']) + '\t'
+                + str(Perf['Specificity_avg']) + '\n')
+
+if __name__ is '__main__':
+    for d in Path('/home/andreas/glacier-front-detection/output_256').iterdir():
+        if d.is_dir():
+            evaluate(Path('/home/andreas/glacier-front-detection/front_detection_dataset/test'), d)

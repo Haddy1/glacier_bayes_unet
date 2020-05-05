@@ -19,7 +19,6 @@ from shutil import copy, rmtree
 import tensorflow as tf
 from preprocessing.preprocessor import Preprocessor
 from preprocessing import data_generator, filter
-import bm3d
 
 #Hyper-parameter tuning
 parser = argparse.ArgumentParser(description='Glacier Front Segmentation')
@@ -32,8 +31,8 @@ parser.add_argument('--EARLY_STOPPING', default=1, type=int, help='If 1, classif
 parser.add_argument("--loss", help="loss function for the deep classifiers training ", choices=["binary_crossentropy", "focal_loss", "combined_loss"], default="binary_crossentropy")
 parser.add_argument('--loss_parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...", help='dictionary with parameters for loss function')
 parser.add_argument('--image_aug', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...",
-                    help='dictionary with the augmentation for keras Image Processing', default={'horizontal_flip':True,'rotation_range':90, 'fill_mode':'nearest'})
-parser.add_argument("--denoise", help="Denoise filter", choices=["none", "bilateral", "median", 'nlmeans', "bm3d", "enhanced_lee", "kuan"], default="None")
+                    help='dictionary with the augmentation for keras Image Processing', default={'horizontal_flip':True,'rotation_range':0, 'fill_mode':'nearest'})
+parser.add_argument("--denoise", help="Denoise filter", choices=["none", "bilateral", "median", 'nlmeans', "enhanced_lee", "kuan"], default="None")
 parser.add_argument('--denoise_parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...", help='dictionary with parameters for denoise filter')
 parser.add_argument('--contrast', default=0, type=int, help='Contrast Enhancement')
 parser.add_argument('--image_patches', default=0, type=int, help='Training data is already split into image patches')
@@ -106,11 +105,6 @@ elif denoise == 'nlmeans':
         preprocessor.add_filter(lambda img: cv2.fastNlMeansDenoising(img, None, **args.denoise_parms))
     else:
         preprocessor.add_filter(lambda img: cv2.fastNlMeansDenoising(img, None))
-elif denoise == 'bm3d':
-    if args.denoise_parms:
-        preprocessor.add_filter(lambda img: bm3d(img, **args.denoise_parms))
-    else:
-        preprocessor.add_filter(lambda img: bm3d.bm3d(img, sigma_psd=30))
 elif denoise == 'kuan':
     preprocessor.add_filter(lambda img: filter.kuan(img))
 elif denoise == 'enhanced_lee':
@@ -165,11 +159,6 @@ elif args.loss == 'binary_crossentropy':
 else:
     loss_function = locals()[args.loss]
 
-
-data_gen_args = dict(horizontal_flip=True,
-                     rotation_range=90,
-                    fill_mode='nearest')
-
 train_Generator = trainGenerator(batch_size = batch_size,
                         train_path = str(Path(patches_path, 'train')),
                         image_folder = 'images',
@@ -202,6 +191,12 @@ History = model.fit_generator(train_Generator,
                     callbacks=[model_checkpoint, early_stopping])
 #model.fit_generator(train_Generator, steps_per_epoch=300, epochs=1, callbacks=[model_checkpoint], class_weight=[0.0000001,0.9999999])
 
+# # save model
+model.save(str(Path(out_path,'model_' + model.name + '.h5').absolute()))
+try:
+    pickle.dump(model.history,open(Path(out_path, 'history_' + model.name + '.pkl'), 'wb'))
+except:
+    print("History could not be saved")
 ##########
 ##########
 # save loss plot
@@ -209,6 +204,8 @@ plt.figure()
 plt.rcParams.update({'font.size': 18})
 plt.plot(model.history.epoch, model.history.history['loss'], 'X-', label='training loss', linewidth=4.0)
 plt.plot(model.history.epoch, model.history.history['val_loss'], 'o-', label='validation loss', linewidth=4.0)
+plt.xlim(-5,105)
+plt.ylim(0,1.2)
 plt.xlabel('epoch')
 plt.ylabel('loss')
 plt.legend(loc='upper right')
@@ -217,8 +214,6 @@ plt.grid(which='minor', linestyle='--')
 plt.savefig(str(Path(str(out_path), 'loss_plot.png')), bbox_inches='tight', format='png', dpi=200)
 plt.show()
 
-# # save model
-model.save(str(Path(out_path,'model_' + model.name + '.h5').absolute()))
 
 # Cleanup
 os.remove(Path(str(out_path), 'unet_zone.hdf5'))

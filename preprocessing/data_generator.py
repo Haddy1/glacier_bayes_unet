@@ -1,7 +1,7 @@
 from pathlib import Path
 import numpy as np
 import cv2
-from preprocessing import image_patches
+from preprocessing import image_patches, preprocessor
 import json
 import random
 import shutil
@@ -85,6 +85,9 @@ if __name__ == "__main__":
     random.seed(42)
     patch_size = 128
 
+    preprocessor = preprocessor.Preprocessor()
+
+    preprocessor.add_filter()
     out_dir = Path('/home/andreas/glacier-front-detection/data_' + str(patch_size))
     data_dir = Path('/home/andreas/glacier-front-detection/front_detection_dataset')
 

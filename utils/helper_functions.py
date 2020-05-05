@@ -30,6 +30,11 @@ def specificity(y_true, y_pred):
     result = tn / (tn + fp + K.epsilon())
     return result
 
+def IOU(y_true, y_pred):
+    intersection = np.sum(y_true == y_pred)
+    union = y_true.size
+    return intersection / union
+
 
 class StoreDictKeyPair(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
