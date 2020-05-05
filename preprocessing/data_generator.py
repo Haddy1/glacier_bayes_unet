@@ -34,14 +34,14 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
         print(f)
         basename = f.stem
         img = cv2.imread(str(f), cv2.IMREAD_GRAYSCALE)
+        if preprocessor is not None:
+            img = preprocessor.process(img)
         img = cv2.copyMakeBorder(img, 0, (patch_size - img.shape[0]) % patch_size, 0, (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
         mask_front = cv2.imread(str(Path(in_dir, 'masks_front', basename + '_front.png')), cv2.IMREAD_GRAYSCALE)
         mask_front = cv2.copyMakeBorder(mask_front, 0, (patch_size - img.shape[0]) % patch_size, 0, (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
         mask_zones = cv2.imread(str(Path(in_dir, 'masks_zones', basename + '_zones.png')), cv2.IMREAD_GRAYSCALE)
         mask_zones = cv2.copyMakeBorder(mask_zones, 0, (patch_size - img.shape[0]) % patch_size, 0, (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
 
-        if preprocessor is not None:
-            img = preprocessor.process(img)
 
 
         mask_zones[mask_zones == 127] = 0

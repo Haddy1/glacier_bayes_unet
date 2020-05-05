@@ -28,14 +28,15 @@ for dir in dirs:
 
 
     arguments = json.load(open(Path(dir, 'arguments.json'), 'r'))
-    #loss_split = arguments['loss_parms']
-    #split = str(loss_split['binary_crossentropy']) + '_' + str(loss_split['focal_loss'])
-    #all_results[split] = results
-    denoise_filter = arguments['denoise']
-    all_results[denoise_filter] = results
+    loss_split = arguments['loss_parms']
+    split = str(loss_split['binary_crossentropy']) + '_' + str(loss_split['focal_loss'])
+    all_results[split] = results
+    #denoise_filter = arguments['denoise']
+    #all_results[denoise_filter] = results
 
-    #copy(Path(dir, 'loss_plot.png'), Path(out, 'loss' + split + '.png'))
-    copy(Path(dir, 'loss_plot.png'), Path(out, 'loss' + denoise_filter + '.png'))
+    copy(Path(dir, 'loss_plot.png'), Path(out, 'loss' + split + '.png'))
+    copy(Path(dir, '2009-07-12_ENVISAT_20_3.png'), Path(out, '2009-07-12_ENVISAT_20_3_' + split + '.png'))
+    #copy(Path(dir, 'loss_plot.png'), Path(out, 'loss' + denoise_filter + '.png'))
 
 with open(Path(out,'results.tex'), 'w') as f:
     f.write('& Dice & IOU & Eucl & Sensitivity & Specificity\\\\\n')

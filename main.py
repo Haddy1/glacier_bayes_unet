@@ -189,7 +189,6 @@ History = model.fit_generator(train_Generator,
                     validation_data=val_Generator,
                     validation_steps=validation_steps,
                     callbacks=[model_checkpoint, early_stopping])
-#model.fit_generator(train_Generator, steps_per_epoch=300, epochs=1, callbacks=[model_checkpoint], class_weight=[0.0000001,0.9999999])
 
 # # save model
 model.save(str(Path(out_path,'model_' + model.name + '.h5').absolute()))
