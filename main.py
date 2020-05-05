@@ -66,8 +66,6 @@ else:
     data_path = Path('data')
 
 
-num_samples = len([file for file in Path(data_path, 'train/images').rglob('*.png')]) # number of training samples
-num_val_samples = len([file for file in Path(data_path, 'val/images').rglob('*.png')]) # number of validation samples
 
 if args.out_path:
     out_path = Path(args.out_path)
@@ -92,9 +90,9 @@ preprocessor = Preprocessor()
 denoise = args.denoise.lower()
 if denoise == 'bilateral':
     if args.denoise_parms:
-        preprocessor.add_filter(lambda  img:cv2.bilateralFilter(img, None,**args.denoise_parms))
+        preprocessor.add_filter(lambda  img:cv2.bilateralFilter(img,**args.denoise_parms))
     else:
-        preprocessor.add_filter(lambda img:cv2.bilateralFilter(img, None,20, 80, 80))
+        preprocessor.add_filter(lambda img:cv2.bilateralFilter(img, 20, 80, 80))
 elif denoise == 'median':
     if args.denoise_parms:
         preprocessor.add_filter(lambda img: cv2.medianBlur(img, **args.denoise_parms))
@@ -102,9 +100,9 @@ elif denoise == 'median':
         preprocessor.add_filter(lambda img: cv2.medianBlur(img, 5))
 elif denoise == 'nlmeans':
     if args.denoise_parms:
-        preprocessor.add_filter(lambda img: cv2.fastNlMeansDenoising(img, None, **args.denoise_parms))
+        preprocessor.add_filter(lambda img: cv2.fastNlMeansDenoising(img,**args.denoise_parms))
     else:
-        preprocessor.add_filter(lambda img: cv2.fastNlMeansDenoising(img, None))
+        preprocessor.add_filter(lambda img: cv2.fastNlMeansDenoising(img))
 elif denoise == 'kuan':
     preprocessor.add_filter(lambda img: filter.kuan(img))
 elif denoise == 'enhanced_lee':
@@ -175,11 +173,13 @@ val_Generator = trainGenerator(batch_size = batch_size,
 
 
 
-model = unet_Enze19_2(loss_function=loss_function)
+model = unet_Enze19_2(loss_function=loss_function, input_size=(patch_size,patch_size, 1))
 model_checkpoint = ModelCheckpoint(str(Path(str(out_path), 'unet_zone.hdf5')), monitor='val_loss', verbose=0, save_best_only=True)
 early_stopping = EarlyStopping('val_loss', patience=20, verbose=0, mode='auto', restore_best_weights=True)
 
 
+num_samples = len([file for file in Path(patches_path, 'train/images').rglob('*.png')]) # number of training samples
+num_val_samples = len([file for file in Path(patches_path, 'val/images').rglob('*.png')]) # number of validation samples
 
 steps_per_epoch = np.ceil(num_samples / batch_size)
 validation_steps = np.ceil(num_val_samples / batch_size)
@@ -223,7 +223,6 @@ if Path(out_path, 'patches').exists():
 #####################
 #####################
 import skimage.io as io
-import Amir_utils
 from utils.evaluate import  evaluate
 from pathlib import Path
 from preprocessing.image_patches import extract_grayscale_patches, reconstruct_from_grayscale_patches

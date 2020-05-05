@@ -83,7 +83,7 @@ def generate_subset(data_dir, out_dir, set_size, patch_size=256, preprocessor=No
 
 if __name__ == "__main__":
     random.seed(42)
-    patch_size = 128
+    patch_size = 256
 
     preprocessor = preprocessor.Preprocessor()
 
