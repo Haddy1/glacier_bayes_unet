@@ -4,6 +4,7 @@ from scipy.spatial import distance
 import numpy as np
 from sklearn.metrics import f1_score, recall_score
 from utils import helper_functions
+import pickle
 from matplotlib import pyplot as plt
 import json
 
@@ -68,6 +69,8 @@ def evaluate(test_path, prediction_path):
                 + str(Perf['EUCL_avg']) + '\t'
                 + str(Perf['Sensitivity_avg']) + '\t'
                 + str(Perf['Specificity_avg']) + '\n')
+
+    pickle.dump(Perf, open(Path(prediction_path, 'scores.pkl'), 'wb'))
 
 if __name__ is '__main__':
     for d in Path('/home/andreas/glacier-front-detection/output_256').iterdir():
