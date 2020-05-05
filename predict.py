@@ -5,12 +5,14 @@ from keras.models import load_model
 import pickle
 import argparse
 from loss_functions import *
+from preprocessing.preprocessor import Preprocessor
 from keras.losses import binary_crossentropy
 import numpy as np
 import skimage.io as io
 import cv2
 from utils.evaluate import evaluate
 from preprocessing.image_patches import extract_grayscale_patches, reconstruct_from_grayscale_patches
+import preprocessing.data_generator as data_generator
 
 parser = argparse.ArgumentParser(description='Glacier Front Segmentation Prediction')
 parser.add_argument('--model_path', type=str, help='Path containing trained model')
@@ -29,10 +31,42 @@ if args.debug:
         tf.config.experimental.set_memory_growth(gpu, True)
 
    # tf.config.experimental.set_virtual_device_configuration(gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=4096)])
+if args.evaluate:
+    img_path = Path(args.data_path, 'images')
+else:
+    img_path = Path(args.data_path)
 
 model_path = Path(args.model_path)
-
 options = json.load(open(Path(model_path, 'arguments.json'), 'r'))
+# Preprocessing
+preprocessor = Preprocessor()
+denoise = options['denoise'].lower()
+if denoise == 'bilateral':
+    if 'denoise_parms' in options:
+        preprocessor.add_filter(lambda  img:cv2.bilateralFilter(img, None,**options['denoise_parms']))
+    else:
+        preprocessor.add_filter(lambda img:cv2.bilateralFilter(img, None,20, 80, 80))
+elif denoise == 'median':
+    if 'denoise_parms' in options:
+        preprocessor.add_filter(lambda img: cv2.medianBlur(img, **options['denoise_parms']))
+    else:
+        preprocessor.add_filter(lambda img: cv2.medianBlur(img, 5))
+elif denoise == 'nlmeans':
+    if 'denoise_parms' in options:
+        preprocessor.add_filter(lambda img: cv2.fastNlMeansDenoising(img, None, **options['denoise_parms']))
+    else:
+        preprocessor.add_filter(lambda img: cv2.fastNlMeansDenoising(img, None))
+elif denoise == 'kuan':
+    preprocessor.add_filter(lambda img: filter.kuan(img))
+elif denoise == 'enhanced_lee':
+    preprocessor.add_filter(lambda img: filter.enhanced_lee(img))
+
+
+if 'contrast' in options and options['contrast']:
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(25, 25))  # CLAHE adaptive contrast enhancement
+    preprocessor.add_filter(clahe.apply)
+
+
 model_file = next(model_path.glob('model_*.h5'))
 model_name = model_file.name[6:-3]
 if options['loss'] == "combined_loss":
@@ -76,10 +110,6 @@ if not out_path.exists():
     out_path.mkdir(parents=True)
 
 
-if args.evaluate:
-    img_path = Path(args.data_path, 'images')
-else:
-    img_path = Path(args.data_path)
 
 patch_size = options['patch_size']
 
@@ -96,6 +126,7 @@ img_list = None
 for filename in img_path.rglob('*.png'):
     print(filename)
     img = io.imread(filename, as_gray=True)
+    img = preprocessor.process(img)
     img = img / 255
     img_pad = cv2.copyMakeBorder(img, 0, (patch_size - img.shape[0]) % patch_size, 0, (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
     p_img, i_img = extract_grayscale_patches(img_pad, (patch_size, patch_size), stride = (patch_size, patch_size))

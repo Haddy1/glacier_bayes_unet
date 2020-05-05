@@ -246,6 +246,7 @@ img_list = None
 
 for filename in Path(test_path,'images').rglob('*.png'):
     img = io.imread(filename, as_gray=True)
+    img = preprocessor.process(img)
     img = img / 255
     img_pad = cv2.copyMakeBorder(img, 0, (patch_size - img.shape[0]) % patch_size, 0, (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
     p_img, i_img = extract_grayscale_patches(img_pad, (patch_size, patch_size), stride = (patch_size, patch_size))

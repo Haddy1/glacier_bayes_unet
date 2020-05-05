@@ -87,11 +87,10 @@ if __name__ == "__main__":
 
     preprocessor = preprocessor.Preprocessor()
 
-    preprocessor.add_filter()
-    out_dir = Path('/home/andreas/glacier-front-detection/data_' + str(patch_size))
+    out_dir = Path('/home/andreas/glacier-front-detection/data_filter' + str(patch_size))
     data_dir = Path('/home/andreas/glacier-front-detection/front_detection_dataset')
 
     shutil.copytree(Path(data_dir, 'test'), Path(out_dir, 'test'))
 
-    process_data(Path(data_dir, 'train'), Path(out_dir, 'train'), patch_size=patch_size)
-    process_data(Path(data_dir, 'val'), Path(out_dir, 'val'), patch_size=patch_size)
+    process_data(Path(data_dir, 'train'), Path(out_dir, 'train'), patch_size=patch_size, preprocessor=preprocessor)
+    process_data(Path(data_dir, 'val'), Path(out_dir, 'val'), patch_size=patch_size, preprocessor=preprocessor)
