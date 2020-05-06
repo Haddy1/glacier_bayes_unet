@@ -6,6 +6,7 @@ import pickle
 import argparse
 from loss_functions import *
 from preprocessing.preprocessor import Preprocessor
+from preprocessing import filter
 from keras.losses import binary_crossentropy
 import numpy as np
 import skimage.io as io
@@ -40,67 +41,23 @@ model_path = Path(args.model_path)
 options = json.load(open(Path(model_path, 'arguments.json'), 'r'))
 # Preprocessing
 preprocessor = Preprocessor()
-denoise = options['denoise'].lower()
-if denoise == 'bilateral':
+if 'denoise' in options:
     if 'denoise_parms' in options:
-        preprocessor.add_filter(lambda  img:cv2.bilateralFilter(img, None,**options['denoise_parms']))
+        preprocessor.add_filter(filter.get_denoise_filter(options['denoise']))
     else:
-        preprocessor.add_filter(lambda img:cv2.bilateralFilter(img, None,20, 80, 80))
-elif denoise == 'median':
-    if 'denoise_parms' in options:
-        preprocessor.add_filter(lambda img: cv2.medianBlur(img, **options['denoise_parms']))
-    else:
-        preprocessor.add_filter(lambda img: cv2.medianBlur(img, 5))
-elif denoise == 'nlmeans':
-    if 'denoise_parms' in options:
-        preprocessor.add_filter(lambda img: cv2.fastNlMeansDenoising(img, None, **options['denoise_parms']))
-    else:
-        preprocessor.add_filter(lambda img: cv2.fastNlMeansDenoising(img, None))
-elif denoise == 'kuan':
-    preprocessor.add_filter(lambda img: filter.kuan(img))
-elif denoise == 'enhanced_lee':
-    preprocessor.add_filter(lambda img: filter.enhanced_lee(img))
-
+        preprocessor.add_filter(filter.get_denoise_filter(options['denoise'], options['denoise_parms']))
 
 if 'contrast' in options and options['contrast']:
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(25, 25))  # CLAHE adaptive contrast enhancement
     preprocessor.add_filter(clahe.apply)
 
+if 'loss_parms' in options:
+    loss_function = get_loss_function(options['loss'], options['loss_parms'])
+else:
+    loss_function = get_loss_function(options['loss'])
 
 model_file = next(model_path.glob('model_*.h5'))
 model_name = model_file.name[6:-3]
-if options['loss'] == "combined_loss":
-    if not 'loss_parms' in options:
-        print("combined_loss needs loss functions as parameter")
-    else:
-        functions = []
-        split = []
-        for func_name, weight in options['loss_parms'].items():
-
-            # for functions with additional parameters
-            # generate loss function with default parameters
-            # and standard y_true,y_pred signature
-            if func_name == "focal_loss":
-                function = locals()[func_name]()
-            else:
-                function = locals()[func_name]
-            functions.append(function)
-            split.append(float(weight))
-
-        loss_function = combined_loss(functions, split)
-
-# for loss functions with additional parameters call to get function with y_true, y_pred arguments
-elif options['loss'] == 'focal_loss':
-    if 'loss_parms' in options:
-        loss_function = locals()[options['loss']](**options['loss_parms'])
-    else:
-        loss_function = locals()[options['loss']]()
-elif options['loss'] == 'binary_crossentropy':
-    loss_function = binary_crossentropy
-else:
-    loss_function = locals()[options['loss']]
-
-
 model = load_model(str(model_file.absolute()), custom_objects={ 'loss': loss_function})
 
 

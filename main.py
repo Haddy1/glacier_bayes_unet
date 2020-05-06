@@ -88,26 +88,8 @@ with open(Path(out_path, 'arguments.json'), 'w') as f:
 
 # Preprocessing
 preprocessor = Preprocessor()
-denoise = args.denoise.lower()
-if denoise == 'bilateral':
-    if args.denoise_parms:
-        preprocessor.add_filter(lambda  img:cv2.bilateralFilter(img,**args.denoise_parms))
-    else:
-        preprocessor.add_filter(lambda img:cv2.bilateralFilter(img, 20, 80, 80))
-elif denoise == 'median':
-    if args.denoise_parms:
-        preprocessor.add_filter(lambda img: cv2.medianBlur(img, **args.denoise_parms))
-    else:
-        preprocessor.add_filter(lambda img: cv2.medianBlur(img, 5))
-elif denoise == 'nlmeans':
-    if args.denoise_parms:
-        preprocessor.add_filter(lambda img: cv2.fastNlMeansDenoising(img,**args.denoise_parms))
-    else:
-        preprocessor.add_filter(lambda img: cv2.fastNlMeansDenoising(img))
-elif denoise == 'kuan':
-    preprocessor.add_filter(lambda img: filter.kuan(img))
-elif denoise == 'enhanced_lee':
-    preprocessor.add_filter(lambda img: filter.enhanced_lee(img))
+if args.denoise:
+    preprocessor.add_filter(filter.get_denoise_filter(args.denoise, args.denoise_parms))
 
 
 if args.contrast:
@@ -126,37 +108,6 @@ for d in patches_path.iterdir():
 
 
 
-if args.loss == "combined_loss":
-    if not args.loss_parms:
-        print("combined_loss needs loss functions as parameter")
-    else:
-        functions = []
-        split = []
-        for func_name, weight in args.loss_parms.items():
-
-            # for functions with additional parameters
-            # generate loss function with default parameters
-            # and standard y_true,y_pred signature
-            if func_name == "focal_loss":
-                function = locals()[func_name]()
-            else:
-                function = locals()[func_name]
-            functions.append(function)
-            split.append(float(weight))
-
-        loss_function = combined_loss(functions, split)
-
-# for loss functions with additional parameters call to get function with y_true, y_pred arguments
-elif args.loss == 'focal_loss':
-    if args.loss_parms:
-        loss_function = locals()[args.loss](**args.loss_parms)
-        #loss_function = locals()[args.LOSS](alpha=args.alpha, gamma=args.gamma)
-    else:
-        loss_function = locals()[args.loss]()
-elif args.loss == 'binary_crossentropy':
-    loss_function = binary_crossentropy
-else:
-    loss_function = locals()[args.loss]
 
 train_Generator = trainGenerator(batch_size = batch_size,
                         train_path = str(Path(patches_path, 'train')),
@@ -172,7 +123,7 @@ val_Generator = trainGenerator(batch_size = batch_size,
                         aug_dict = None,
                         save_to_dir = None)
 
-
+loss_function = get_loss_function(args.loss, args.loss_parms)
 
 model = unet_Enze19_2(loss_function=loss_function, input_size=(patch_size,patch_size, 1))
 model_checkpoint = ModelCheckpoint(str(Path(str(out_path), 'unet_zone.hdf5')), monitor='val_loss', verbose=0, save_best_only=True)
@@ -184,7 +135,7 @@ num_val_samples = len([file for file in Path(patches_path, 'val/images').rglob('
 
 steps_per_epoch = np.ceil(num_samples / batch_size)
 validation_steps = np.ceil(num_val_samples / batch_size)
-History = model.fit_generator(train_Generator,
+history = model.fit_generator(train_Generator,
                     steps_per_epoch=steps_per_epoch,
                     epochs=args.epochs,
                     validation_data=val_Generator,
@@ -194,7 +145,7 @@ History = model.fit_generator(train_Generator,
 # # save model
 model.save(str(Path(out_path,'model_' + model.name + '.h5').absolute()))
 try:
-    pickle.dump(model.history,open(Path(out_path, 'history_' + model.name + '.pkl'), 'wb'))
+    pickle.dump(history.history,open(Path(out_path, 'history_' + model.name + '.pkl'), 'wb'))
 except:
     print("History could not be saved")
 ##########

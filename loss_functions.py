@@ -1,5 +1,5 @@
 from keras import backend as K
-import keras.losses
+from keras.losses import *
 import tensorflow as tf
 from scipy.spatial.distance import dice
 
@@ -42,3 +42,39 @@ def combined_loss(loss_functions, split):
         return combined_result
 
     return loss
+
+
+def get_loss_function(loss, loss_parameters=None):
+    if loss == "combined_loss":
+        if not loss_parameters:
+            print("combined_loss needs loss functions as parameter")
+        else:
+            functions = []
+            split = []
+            for func_name, weight in loss_parameters.items():
+
+                # for functions with additional parameters
+                # generate loss function with default parameters
+                # and standard y_true,y_pred signature
+                if func_name == "focal_loss":
+                    function = globals()[func_name]()
+                else:
+                    function = globals()[func_name]
+                functions.append(function)
+                split.append(float(weight))
+
+            loss_function = combined_loss(functions, split)
+
+    # for loss functions with additional parameters call to get function with y_true, y_pred arguments
+    elif loss == 'focal_loss':
+        if loss_parameters:
+            loss_function = globals()[loss](**loss_parameters)
+            #loss_function = locals()[loss_string](alpha=args.alpha, gamma=args.gamma)
+        else:
+            loss_function = globals()[loss]()
+    elif loss == 'binary_crossentropy':
+        loss_function = binary_crossentropy
+    else:
+        loss_function = globals()[loss]
+
+    return loss_function

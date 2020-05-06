@@ -28,6 +28,33 @@ def enhanced_lee(img, window_size=7, looks=2, damp_factor=1, eps=10e-6):
     return R.astype(img.dtype)
 
 
+def get_denoise_filter(denoise, denoise_parameters=None):
+    denoise = denoise.lower()
+    if denoise == 'bilateral':
+        if denoise_parameters:
+            return lambda  img:cv2.bilateralFilter(img,**denoise_parameters)
+        else:
+            return lambda img:cv2.bilateralFilter(img, 20, 80, 80)
+    elif denoise == 'median':
+        if denoise_parameters:
+            return lambda img: cv2.medianBlur(img, **denoise_parameters)
+        else:
+            return lambda img: cv2.medianBlur(img, 5)
+    elif denoise == 'nlmeans':
+        if denoise_parameters:
+            return lambda img: cv2.fastNlMeansDenoising(img,**denoise_parameters)
+        else:
+            return lambda img: cv2.fastNlMeansDenoising(img)
+    elif denoise == 'kuan':
+        return lambda img: filter.kuan(img)
+    elif denoise == 'enhanced_lee':
+        return lambda img: filter.enhanced_lee(img)
+    elif denoise == 'none':
+        return None
+
+    raise NotImplementedError(denoise + " is not Implemented")
+
+
 
 
 

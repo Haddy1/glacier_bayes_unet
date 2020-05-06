@@ -8,7 +8,7 @@ import pickle
 from matplotlib import pyplot as plt
 import json
 
-def evaluate(test_path, prediction_path):
+def evaluate(test_path, prediction_path, model_history=None):
     DICE_all = []
     EUCL_all = []
     IOU_all = []
@@ -43,14 +43,19 @@ def evaluate(test_path, prediction_path):
 
     Perf['Specificity_all'] = Specificity_all
     Perf['Specificity_avg'] = np.mean(Specificity_all)
+    Perf['Specificity_var'] = np.var(Specificity_all)
     Perf['Sensitivity_all'] = Sensitivity_all
     Perf['Sensitivity_avg'] = np.mean(Sensitivity_all)
+    Perf['Sensitivity_var'] = np.var(Sensitivity_all)
     Perf['DICE_all'] = DICE_all
     Perf['DICE_avg'] = DICE_avg
+    Perf['DICE_avg'] = np.var(DICE_all)
     Perf['IOU_all'] = IOU_all
     Perf['IOU_avg'] = np.mean(IOU_all)
+    Perf['IOU_avg'] = np.var(IOU_all)
     Perf['EUCL_all'] = EUCL_all
     Perf['EUCL_avg'] = EUCL_avg
+    Perf['EUCL_avg'] = np.var(EUCL_all)
     Perf['test_file_names'] = test_file_names
     print(prediction_path)
     print('Dice\tIOU\tEucl\tSensitivity\tSpecificitiy')
