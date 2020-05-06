@@ -77,20 +77,35 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
 def generate_subset(data_dir, out_dir, set_size, patch_size=256, preprocessor=None):
     files_img = list(Path(data_dir, 'images').glob('*.png'))
     img_subset = random.sample(files_img, set_size)
-    process_data(data_dir, out_dir, patch_size=patch_size, preprocessor=preprocessor, img_list=img_subset)
+    if not Path(out_dir, 'images').exists():
+        Path(out_dir, 'images').mkdir(parents=True)
+    if not Path(out_dir, 'masks_front').exists():
+        Path(out_dir, 'masks_front').mkdir()
+    if not Path(out_dir, 'masks_zones').exists():
+        Path(out_dir, 'masks_zones').mkdir()
+
+    if patch_size is None:
+        for f in img_subset:
+            print(f)
+            basename = f.stem
+            shutil.copy(f, Path(out_dir, 'images/'))
+            shutil.copy(Path(data_dir, 'masks_front', basename + '_front.png'), Path(out_dir, 'masks_front/'))
+            shutil.copy(Path(data_dir, 'masks_zones', basename + '_zones.png'), Path(out_dir, 'masks_zones/'))
+    else:
+        process_data(data_dir, out_dir, patch_size=patch_size, preprocessor=preprocessor, img_list=img_subset)
 
 
 
 if __name__ == "__main__":
     random.seed(42)
-    patch_size = 256
+    #patch_size = 256
 
     preprocessor = preprocessor.Preprocessor()
 
-    out_dir = Path('/home/andreas/glacier-front-detection/data_filter' + str(patch_size))
+    out_dir = Path('/home/andreas/glacier-front-detection/data_filter')
     data_dir = Path('/home/andreas/glacier-front-detection/front_detection_dataset')
 
-    shutil.copytree(Path(data_dir, 'test'), Path(out_dir, 'test'))
 
-    process_data(Path(data_dir, 'train'), Path(out_dir, 'train'), patch_size=patch_size, preprocessor=preprocessor)
-    process_data(Path(data_dir, 'val'), Path(out_dir, 'val'), patch_size=patch_size, preprocessor=preprocessor)
+    generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), 10, patch_size=None)
+    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), 30, patch_size=None)
+    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), 10, patch_size=None)
