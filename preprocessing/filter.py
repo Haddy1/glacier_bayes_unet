@@ -46,9 +46,9 @@ def get_denoise_filter(denoise, denoise_parameters=None):
         else:
             return lambda img: cv2.fastNlMeansDenoising(img)
     elif denoise == 'kuan':
-        return lambda img: filter.kuan(img)
+        return lambda img: kuan(img)
     elif denoise == 'enhanced_lee':
-        return lambda img: filter.enhanced_lee(img)
+        return lambda img: enhanced_lee(img)
     elif denoise == 'none':
         return None
 
