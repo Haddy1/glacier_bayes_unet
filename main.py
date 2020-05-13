@@ -28,7 +28,7 @@ parser.add_argument('--patience', default=30, type=int, help='how long to wait f
 parser.add_argument('--batch_size', default=100, type=int, help='batch size (integer value)')
 parser.add_argument('--patch_size', default=256, type=int, help='batch size (integer value)')
 
-parser.add_argument('--EARLY_STOPPING', default=1, type=int, help='If 1, classifier is using early stopping based on validation loss with patience 20 (0/1)')
+parser.add_argument('--EARLY_STOPPING', default=1, type=int, help='If 1, classifier is using early stopping based on val loss with patience 20 (0/1)')
 parser.add_argument("--loss", help="loss function for the deep classifiers training ", choices=["binary_crossentropy", "focal_loss", "combined_loss"], default="binary_crossentropy")
 parser.add_argument('--loss_parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...", help='dictionary with parameters for loss function')
 parser.add_argument('--image_aug', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...",
@@ -39,7 +39,7 @@ parser.add_argument('--contrast', default=0, type=int, help='Contrast Enhancemen
 parser.add_argument('--image_patches', default=0, type=int, help='Training data is already split into image patches')
 
 parser.add_argument('--out_path', type=str, help='Output path for results')
-parser.add_argument('--data_path', type=str, help='Path containing training and validation data')
+parser.add_argument('--data_path', type=str, help='Path containing training and val data')
 parser.add_argument('--debug', action='store_true')
 
 # parser.add_argument('--Random_Seed', default=1, type=int, help='random seed number value (any integer value)')
@@ -112,14 +112,14 @@ for d in patches_path.iterdir():
 train_Generator = trainGenerator(batch_size = batch_size,
                         train_path = str(Path(patches_path, 'train')),
                         image_folder = 'images',
-                        mask_folder = 'masks_zones',
+                        mask_folder = 'masks',
                         aug_dict = args.image_aug,
                         save_to_dir = None)
 
 val_Generator = trainGenerator(batch_size = batch_size,
                         train_path = str(Path(patches_path, 'val')),
                         image_folder = 'images',
-                        mask_folder = 'masks_zones',
+                        mask_folder = 'masks',
                         aug_dict = None,
                         save_to_dir = None)
 
@@ -131,7 +131,7 @@ early_stopping = EarlyStopping('val_loss', patience=args.patience, verbose=0, mo
 
 
 num_samples = len([file for file in Path(patches_path, 'train/images').rglob('*.png')]) # number of training samples
-num_val_samples = len([file for file in Path(patches_path, 'val/images').rglob('*.png')]) # number of validation samples
+num_val_samples = len([file for file in Path(patches_path, 'val/images').rglob('*.png')]) # number of val samples
 
 steps_per_epoch = np.ceil(num_samples / batch_size)
 validation_steps = np.ceil(num_val_samples / batch_size)
@@ -154,7 +154,7 @@ except:
 plt.figure()
 plt.rcParams.update({'font.size': 18})
 plt.plot(model.history.epoch, model.history.history['loss'], 'X-', label='training loss', linewidth=4.0)
-plt.plot(model.history.epoch, model.history.history['val_loss'], 'o-', label='validation loss', linewidth=4.0)
+plt.plot(model.history.epoch, model.history.history['val_loss'], 'o-', label='val loss', linewidth=4.0)
 plt.xlim(-5,105)
 plt.ylim(0,1.2)
 plt.xlabel('epoch')

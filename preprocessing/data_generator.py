@@ -18,10 +18,10 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
 
     if not Path(out_dir, 'images').exists():
         Path(out_dir, 'images').mkdir()
-    if not Path(out_dir, 'masks_front').exists():
-        Path(out_dir, 'masks_front').mkdir()
-    if not Path(out_dir, 'masks_zones').exists():
-        Path(out_dir, 'masks_zones').mkdir()
+    if not Path(out_dir, 'masks').exists():
+        Path(out_dir, 'masks').mkdir()
+    if not Path(out_dir, 'lines').exists():
+        Path(out_dir, 'lines').mkdir()
 
     if img_list:
         files_img = img_list
@@ -36,11 +36,8 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
         img = cv2.imread(str(f), cv2.IMREAD_GRAYSCALE)
         if preprocessor is not None:
             img = preprocessor.process(img)
-        img = cv2.copyMakeBorder(img, 0, (patch_size - img.shape[0]) % patch_size, 0, (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
-        mask_front = cv2.imread(str(Path(in_dir, 'masks_front', basename + '_front.png')), cv2.IMREAD_GRAYSCALE)
-        mask_front = cv2.copyMakeBorder(mask_front, 0, (patch_size - img.shape[0]) % patch_size, 0, (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
-        mask_zones = cv2.imread(str(Path(in_dir, 'masks_zones', basename + '_zones.png')), cv2.IMREAD_GRAYSCALE)
-        mask_zones = cv2.copyMakeBorder(mask_zones, 0, (patch_size - img.shape[0]) % patch_size, 0, (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
+        mask_front = cv2.imread(str(Path(in_dir, 'lines', basename + '_front.png')), cv2.IMREAD_GRAYSCALE)
+        mask_zones = cv2.imread(str(Path(in_dir, 'masks', basename + '_zones.png')), cv2.IMREAD_GRAYSCALE)
 
 
 
@@ -56,8 +53,8 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
             # if np.count_nonzero(p_masks_zone[j])/(patch_size*patch_size) > 0.05 and np.count_nonzero(p_masks_zone[j])/(patch_size*patch_size) < 0.95: # only those patches that has both background and foreground
             if np.count_nonzero(p_mask_zones[j])/(patch_size*patch_size) >= 0 and np.count_nonzero(p_mask_zones[j])/(patch_size*patch_size) <= 1:
                 cv2.imwrite(str(Path(out_dir, 'images/'+str(patch_counter)+'.png')), p_img[j])
-                cv2.imwrite(str(Path(out_dir, 'masks_zones/'+str(patch_counter)+'.png')), p_mask_zones[j])
-                cv2.imwrite(str(Path(out_dir, 'masks_front/'+str(patch_counter)+'.png')), p_mask_front[j])
+                cv2.imwrite(str(Path(out_dir, 'masks/'+str(patch_counter)+'.png')), p_mask_zones[j])
+                cv2.imwrite(str(Path(out_dir, 'lines/'+str(patch_counter)+'.png')), p_mask_front[j])
                 patch_indices.append(patch_counter) # store patch nrs used for image
                 patch_counter += 1
 
@@ -74,23 +71,27 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
         json.dump(img_patch_index, f)
 
 
-def generate_subset(data_dir, out_dir, set_size, patch_size=256, preprocessor=None):
+def generate_subset(data_dir, out_dir, set_size=None, patch_size=256, preprocessor=None):
     files_img = list(Path(data_dir, 'images').glob('*.png'))
-    img_subset = random.sample(files_img, set_size)
+    if set_size is not None:
+        img_subset = random.sample(files_img, set_size)
+    else:
+        img_subset = files_img
+
     if not Path(out_dir, 'images').exists():
         Path(out_dir, 'images').mkdir(parents=True)
-    if not Path(out_dir, 'masks_front').exists():
-        Path(out_dir, 'masks_front').mkdir()
-    if not Path(out_dir, 'masks_zones').exists():
-        Path(out_dir, 'masks_zones').mkdir()
+    if not Path(out_dir, 'lines').exists():
+        Path(out_dir, 'lines').mkdir()
+    if not Path(out_dir, 'masks').exists():
+        Path(out_dir, 'masks').mkdir()
 
     if patch_size is None:
         for f in img_subset:
             print(f)
             basename = f.stem
             shutil.copy(f, Path(out_dir, 'images/'))
-            shutil.copy(Path(data_dir, 'masks_front', basename + '_front.png'), Path(out_dir, 'masks_front/'))
-            shutil.copy(Path(data_dir, 'masks_zones', basename + '_zones.png'), Path(out_dir, 'masks_zones/'))
+            shutil.copy(Path(data_dir, 'lines', basename + '_front.png'), Path(out_dir, 'lines/'))
+            shutil.copy(Path(data_dir, 'masks', basename + '_zones.png'), Path(out_dir, 'masks/'))
     else:
         process_data(data_dir, out_dir, patch_size=patch_size, preprocessor=preprocessor, img_list=img_subset)
 
@@ -98,14 +99,14 @@ def generate_subset(data_dir, out_dir, set_size, patch_size=256, preprocessor=No
 
 if __name__ == "__main__":
     random.seed(42)
-    #patch_size = 256
+    patch_size = 256
 
     preprocessor = preprocessor.Preprocessor()
 
-    out_dir = Path('/home/andreas/glacier-front-detection/data_filter')
+    out_dir = Path('/home/andreas/glacier-front-detection/data_256')
     data_dir = Path('/home/andreas/glacier-front-detection/front_detection_dataset')
 
 
-    generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), 10, patch_size=None)
-    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), 30, patch_size=None)
-    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), 10, patch_size=None)
+    generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patch_size=None)
+    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patch_size=patch_size)
+    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patch_size=patch_size)
