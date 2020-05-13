@@ -22,7 +22,7 @@ def evaluate(test_path, prediction_path):
 
     for filename in Path(test_path,'images').rglob('*.png'):
 
-        gt_path = str(Path(test_path,'masks_zones'))
+        gt_path = str(Path(test_path,'masks'))
         gt_name = filename.name.partition('.')[0] + '_zones.png'
         gt = io.imread(str(Path(gt_path,gt_name)), as_gray=True)
         pred = io.imread(Path(prediction_path,filename.name), as_gray=True)
