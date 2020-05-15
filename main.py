@@ -7,7 +7,8 @@ import json
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-from keras.callbacks import ModelCheckpoint, EarlyStopping
+from keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger
+from keras.models import load_model
 import os
 
 from utils.data import trainGenerator
@@ -40,6 +41,7 @@ parser.add_argument('--image_patches', default=0, type=int, help='Training data 
 
 parser.add_argument('--out_path', type=str, help='Output path for results')
 parser.add_argument('--data_path', type=str, help='Path containing training and val data')
+parser.add_argument('--resume_training', type=str, help='Resume training from checkpoint')
 parser.add_argument('--debug', action='store_true')
 
 # parser.add_argument('--Random_Seed', default=1, type=int, help='random seed number value (any integer value)')
@@ -48,8 +50,25 @@ args = parser.parse_args()
 
 START=time.time()
 
+if args.resume_training:
+    if 'hdf5' in args.resume_training:
+        checkpoint_file = Path(args.resume_training)
+    else:
+        checkpoint_file = next(Path(args.resume_traininig).glob('*.hdf5'))
+    if not checkpoint_file.exists():
+        print (checkpoint_file + ' does not exist')
+        exit(-1)
+
+if Path(checkpoint_file.parent, 'arguments.json'):
+    resume_arg = args.resume_training
+    debug = args.debug
+    args.__dict__ = json.load(open(Path(checkpoint_file.parent, 'arguments.json'), 'r'))
+    args.__dict__['resume_training']= resume_arg
+    args.__dict__['debug']= debug
+
 patch_size = args.patch_size
-batch_size = args.batch_size
+#batch_size = args.batch_size
+batch_size = 4
 
 
 if args.debug:
@@ -72,6 +91,7 @@ if args.out_path:
     out_path = Path(args.out_path)
 else:
     out_path = Path('data_' + str(patch_size) + '/test/masks_predicted_' + time.strftime("%y%m%d-%H%M%S"))
+
 
 if args.image_patches:
     patches_path = data_path
@@ -96,7 +116,7 @@ if args.contrast:
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(25, 25))  # CLAHE adaptive contrast enhancement
     preprocessor.add_filter(clahe.apply)
 
-if not args.image_patches:
+if not args.image_patches and not args.resume_training:
     data_generator.process_data(Path(data_path, 'train'), Path(patches_path, 'train'), patch_size=patch_size, preprocessor = preprocessor)
     data_generator.process_data(Path(data_path, 'val'), Path(patches_path, 'val'), patch_size=patch_size, preprocessor = preprocessor)
 
@@ -125,9 +145,15 @@ val_Generator = trainGenerator(batch_size = batch_size,
 
 loss_function = get_loss_function(args.loss, args.loss_parms)
 
-model = unet_Enze19_2(loss_function=loss_function, input_size=(patch_size,patch_size, 1))
-model_checkpoint = ModelCheckpoint(str(Path(str(out_path), 'unet_zone.hdf5')), monitor='val_loss', verbose=0, save_best_only=True)
+if args.resume_training:
+
+    model = load_model(str(checkpoint_file.absolute()), custom_objects={ 'loss': loss_function})
+else:
+    model = unet_Enze19_2(loss_function=loss_function, input_size=(patch_size,patch_size, 1))
+
+model_checkpoint = ModelCheckpoint(str(Path(out_path, 'unet_zone.hdf5')), monitor='val_loss', verbose=0, save_best_only=True)
 early_stopping = EarlyStopping('val_loss', patience=args.patience, verbose=0, mode='auto', restore_best_weights=True)
+csv_logger = CSVLogger(str(Path(out_path, model.name + '_history,.csv')), append=True)
 
 
 num_samples = len([file for file in Path(patches_path, 'train/images').rglob('*.png')]) # number of training samples
@@ -140,7 +166,7 @@ history = model.fit_generator(train_Generator,
                     epochs=args.epochs,
                     validation_data=val_Generator,
                     validation_steps=validation_steps,
-                    callbacks=[model_checkpoint, early_stopping])
+                    callbacks=[model_checkpoint, early_stopping, csv_logger])
 
 # # save model
 model.save(str(Path(out_path,'model_' + model.name + '.h5').absolute()))
