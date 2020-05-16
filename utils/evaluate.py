@@ -65,7 +65,26 @@ def evaluate(test_path, prediction_path):
     #pickle.dump(Perf, open(Path(prediction_path, 'scores.pkl'), 'wb'))
     scores.to_pickle(Path(prediction_path, 'scores.pkl'))
 
+def plot_history(history, out_file, xlim=None, ylim=None):
+    plt.figure()
+    plt.rcParams.update({'font.size': 18})
+    plt.plot( history['loss'], 'X-', label='training loss', linewidth=4.0)
+    plt.plot(history['val_loss'], 'o-', label='val loss', linewidth=4.0)
+    if xlim is not None:
+        plt.xlim(xlim)
+    if ylim is not None:
+        plt.ylim(ylim)
+    plt.xlabel('epoch')
+    plt.ylabel('loss')
+    plt.legend(loc='upper right')
+    plt.minorticks_on()
+    plt.grid(which='minor', linestyle='--')
+    plt.savefig(out_file, bbox_inches='tight', format='png', dpi=200)
+    plt.show()
+
 if __name__ is '__main__':
     for d in Path('/home/andreas/glacier-front-detection/output_combined').iterdir():
         if d.is_dir():
             evaluate(Path('/home/andreas/glacier-front-detection/front_detection_dataset/test'), d)
+            history = pickle.load(open(next(d.glob('history*')), 'rb'))
+            plot_history(history, Path(d, 'loss_plot2.png'), xlim=(-10,250), ylim=(0,3.0))

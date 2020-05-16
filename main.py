@@ -59,7 +59,7 @@ if args.resume_training:
         print (checkpoint_file + ' does not exist')
         exit(-1)
 
-if Path(checkpoint_file.parent, 'arguments.json'):
+if args.resume_training  and Path(checkpoint_file.parent, 'arguments.json').exists():
     resume_arg = args.resume_training
     debug = args.debug
     args.__dict__ = json.load(open(Path(checkpoint_file.parent, 'arguments.json'), 'r'))
@@ -67,8 +67,7 @@ if Path(checkpoint_file.parent, 'arguments.json'):
     args.__dict__['debug']= debug
 
 patch_size = args.patch_size
-#batch_size = args.batch_size
-batch_size = 4
+batch_size = args.batch_size
 
 
 if args.debug:
@@ -181,8 +180,6 @@ plt.figure()
 plt.rcParams.update({'font.size': 18})
 plt.plot(model.history.epoch, model.history.history['loss'], 'X-', label='training loss', linewidth=4.0)
 plt.plot(model.history.epoch, model.history.history['val_loss'], 'o-', label='val loss', linewidth=4.0)
-plt.xlim(-5,105)
-plt.ylim(0,1.2)
 plt.xlabel('epoch')
 plt.ylabel('loss')
 plt.legend(loc='upper right')
