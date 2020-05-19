@@ -3,53 +3,101 @@ import sys
 from pathlib import Path
 import json
 from shutil import copy
+import pandas as pd
+import numpy as np
+from matplotlib import  pyplot as plt
 
-path = Path(sys.argv[1])
-out = Path(sys.argv[2])
+identifier = 'rotate'
+path = Path('output_' + identifier)
+out = Path('/home/andreas/thesis/reports/combined_loss')
 if not out.exists():
     out.mkdir()
-regex = re.compile(path.name)
-dirs = [d for d in path.parent.iterdir() if regex.search(str(d))]
-all_results = {}
-for dir in dirs:
-    if not Path(dir, 'ReportOnModel.txt').exists():
-        continue
-    results = {}
-    with open(Path(dir, 'ReportOnModel.txt'), 'r') as f:
-          content = f.readlines()
-    content = [x.strip() for x in content]
 
-    scores = content[1].split()
-    results['Dice'] = str(round(100 * float(scores[0]), 2))
-    results['IOU'] = str(round(100 * float(scores[1]), 2))
-    results['Eucl'] = scores[2]
-    results['Sensitivity'] = str(round(100 * float(scores[3]), 2))
-    results['Specificity'] = str(round(100 * float(scores[4]), 2))
+all_results = {}
+frames = []
+labels = []
+for dir in path.iterdir():
+    if not Path(dir, 'scores.pkl').exists():
+        continue
+    frames.append(pd.read_pickle(Path(dir, 'scores.pkl')))
 
 
     arguments = json.load(open(Path(dir, 'arguments.json'), 'r'))
     loss_split = arguments['loss_parms']
-    split = str(loss_split['binary_crossentropy']) + '_' + str(loss_split['focal_loss'])
-    all_results[split] = results
-    #denoise_filter = arguments['denoise']
+    if identifier == 'combined':
+        label= str(loss_split['binary_crossentropy']) + '_' + str(loss_split['focal_loss'])
+    elif identifier == 'filter':
+        label = arguments['denoise']
+        if label == 'nlmeans':
+            if arguments['denoise_parms'] is not None:
+                label = 'nlmeans h=70'
+            else:
+                label = 'nlmeans h=3'
+    elif identifier == 'rotate':
+        label = str(arguments['image_aug']['rotation_range'])
+    labels.append(label)
     #all_results[denoise_filter] = results
 
-    copy(Path(dir, 'loss_plot.png'), Path(out, 'loss' + split + '.png'))
-    copy(Path(dir, '2009-07-12_ENVISAT_20_3.png'), Path(out, '2009-07-12_ENVISAT_20_3_' + split + '.png'))
+    copy(Path(dir, 'loss_plot.png'), Path(out, 'imgs', 'loss' + label + '.png'))
+    copy(Path(dir, '2011-01-04_PALSAR_20_4.png'), Path(out, 'imgs', '2011-01-04_PALSAR_20_4_zones_' + identifier + '_' + label + '.png'))
+    copy(Path(dir, '2006-10-18_ERS_20_4.png'), Path(out, 'imgs', '2006-10-18_ERS_20_4_zones_' + identifier + '_' + label + '.png'))
     #copy(Path(dir, 'loss_plot.png'), Path(out, 'loss' + denoise_filter + '.png'))
 
-with open(Path(out,'results.tex'), 'w') as f:
-    f.write('& Dice & IOU & Eucl & Sensitivity & Specificity\\\\\n')
-    for split, results in sorted(all_results.items(), reverse=True):
-        line = split
-        line += ' & ' + results['Dice']
-        line += ' & ' + results['IOU']
-        line += ' & ' + results['Eucl']
-        line += ' & ' + results['Sensitivity']
-        line += ' & ' + results['Specificity'] + " \\\\\n"
+scores = pd.concat(frames, keys = labels)
+scores = scores.sort_index(ascending=True)
+labels = sorted(labels, reverse=False)
+
+def fperc(x):
+    return str(round(x * 100,2))
+
+
+with open(Path(out,'results_' +identifier + '.tex'), 'w') as f:
+    for column in scores.columns:
+        if column == 'image':
+            continue
+        if column == 'euclidian':
+            f.write(' & ' + column + ' (\pm SD)')
+        else:
+            f.write(' & ' + column + '\% (\pm SD)')
+    f.write(' \\\\\n')
+    for label , results in scores.groupby(level=0, sort=False):
+        line = label
+        for column in results.columns:
+            if column == 'image':
+                continue
+            if column == 'euclidian':
+                line += ' & ' + str(round(results[column].mean(),2)) + ' (\\pm ' + str(round(results[column].std(), 2)) + ')'
+            else:
+                line += ' & ' + fperc(results[column].mean()) + ' (\\pm ' + fperc(results[column].std()) + ')'
+        line += " \\\\\n"
         f.write(line)
 
+for column in scores.keys():
+    if column == 'image':
+        continue
+    score = []
+    max = scores[column].max()
+    for label in labels:
+        score.append(scores.loc[label, column])
 
+    ax = plt.figure().gca()
+    ax.yaxis.set_major_locator(plt.MaxNLocator(integer=True))
+
+    if (column == 'euclidian'):
+        plt.hist(score, bins=np.linspace(0, max, 6))
+    else:
+        plt.hist(score, bins=np.linspace(0,1, 6))
+    plt.legend(labels)
+
+    if (column == 'euclidian'):
+        plt.xticks(np.linspace(0, max, 6))
+    else:
+        plt.xticks(np.arange(0,1, 0.2))
+    ax.set_ylabel('Score Count')
+    ax.set_xlabel('Score')
+    plt.title(column)
+    plt.savefig(str(Path(out, 'imgs', 'hist_' + identifier + '_' + column + '.png')), bbox_inches='tight', format='png', dpi=200)
+    plt.show()
 
 
 

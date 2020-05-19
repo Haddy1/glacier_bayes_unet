@@ -83,8 +83,8 @@ def plot_history(history, out_file, xlim=None, ylim=None):
     plt.show()
 
 if __name__ is '__main__':
-    for d in Path('/home/andreas/glacier-front-detection/output_combined').iterdir():
+    for d in Path('/home/andreas/glacier-front-detection/output_filter').iterdir():
         if d.is_dir():
             evaluate(Path('/home/andreas/glacier-front-detection/front_detection_dataset/test'), d)
-            history = pickle.load(open(next(d.glob('history*')), 'rb'))
-            plot_history(history, Path(d, 'loss_plot2.png'), xlim=(-10,250), ylim=(0,3.0))
+            history = pickle.load(open(next(d.glob('history*.pkl')), 'rb'))
+            plot_history(history, Path(d, 'loss_plot.png') , xlim=(-10,250), ylim=(0,1.0))
