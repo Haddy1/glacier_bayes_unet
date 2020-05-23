@@ -5,13 +5,14 @@ program = 'python3 main.py'
 nr_parallel_cmds = 3    # nr of scripts generated
 out_path = 'output_combined'     # where results should be written to
 identifier = 'combined_loss'
+debug = True
 arguments = {
     'loss': 'combined_loss',
     'loss_parms' : {
         'binary_crossentropy':[1.0,0.8,0.6, 0.5,0.4,0.2,0.0],
         'focal_loss': [0.0,0.2,0.4, 0.5,0.6,0.8,1.0]
     },
-    'batch_size':16,
+    'batch_size':4,
     'patch_size':256,
     'data_path': 'data_256',
     'image_patches': 1
@@ -57,14 +58,20 @@ def addArgument(cmds, arg, value):
                 new_cmds.append(cmd)
 
 
-        # Single value
-        else:
+            # Single value
+        elif value is not None:
             new_cmds.append(cmd + " " + str(value))
+        else: #flag
+            new_cmds.append(cmd)
 
     return new_cmds
 
 
 cmds = [program]
+
+if debug:
+    cmds = [program + ' --debug']
+
 for arg, value in arguments.items():
     cmds = addArgument(cmds, arg, value)
 

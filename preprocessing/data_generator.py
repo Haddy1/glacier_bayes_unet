@@ -129,10 +129,10 @@ if __name__ == "__main__":
 
     preprocessor = preprocessor.Preprocessor()
 
-    out_dir = Path('/home/andreas/glacier-front-detection/data_256_flip_rotate')
+    out_dir = Path('/home/andreas/glacier-front-detection/data_256')
     data_dir = Path('/home/andreas/glacier-front-detection/front_detection_dataset')
 
 
-    #generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patch_size=None, augment=augmentation.rotate_flip)
-    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patch_size=patch_size, augment=augmentation.rotate_flip)
-    #generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patch_size=patch_size, augment=augmentation.rotate_flip)
+    generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patch_size=None)
+    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patch_size=patch_size)
+    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patch_size=patch_size)

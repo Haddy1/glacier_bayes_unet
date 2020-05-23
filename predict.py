@@ -13,7 +13,6 @@ import skimage.io as io
 import cv2
 from utils.evaluate import evaluate
 from preprocessing.image_patches import extract_grayscale_patches, reconstruct_from_grayscale_patches
-import preprocessing.data_generator as data_generator
 
 parser = argparse.ArgumentParser(description='Glacier Front Segmentation Prediction')
 parser.add_argument('--model_path', type=str, help='Path containing trained model')
@@ -21,17 +20,9 @@ parser.add_argument('--data_path', type=str, help='Path containing trained model
 parser.add_argument('--out_path', type=str, help='output path for predictions')
 parser.add_argument('--evaluate', action='store_true', help='evaluate model - requires data_path with labeled data')
 parser.add_argument('--batch_size', default=1, type=int, help='batch size (integer value)')
-parser.add_argument('--debug', action='store_true')
+parser.add_argument('--cutoff', default=0.5, type=float, help='cutoff point of binarisation')
 args = parser.parse_args()
 
-if args.debug:
-    gpus = tf.config.experimental.list_physical_devices('GPU')
-
-    # Currently, memory growth needs to be the same across GPUs
-    for gpu in gpus:
-        tf.config.experimental.set_memory_growth(gpu, True)
-
-   # tf.config.experimental.set_virtual_device_configuration(gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=4096)])
 if args.evaluate:
     img_path = Path(args.data_path, 'images')
 else:
@@ -59,6 +50,7 @@ else:
 model_file = next(model_path.glob('model_*.h5'))
 model_name = model_file.name[6:-3]
 model = load_model(str(model_file.absolute()), custom_objects={ 'loss': loss_function})
+print(model_name)
 
 
 out_path = Path(args.out_path)
@@ -95,12 +87,10 @@ for filename in img_path.rglob('*.png'):
     mask_predicted = reconstruct_from_grayscale_patches(p_img_predicted,i_img)[0]
     mask_predicted = mask_predicted[:img.shape[0], :img.shape[1]]
 
-    # to 8 bit image
-    mask_predicted = cv2.normalize(src=mask_predicted, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
 
-    # quantization to make the binary masks
-    mask_predicted[mask_predicted < 127] = 0
-    mask_predicted[mask_predicted >= 127] = 255
+    # thresholding to make binary mask
+    mask_predicted[mask_predicted < args.cutoff] = 0
+    mask_predicted[mask_predicted >= args.cutoff] = 255
 
     io.imsave(Path(str(out_path), Path(filename).name), mask_predicted)
 

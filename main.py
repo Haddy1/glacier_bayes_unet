@@ -48,7 +48,6 @@ parser.add_argument('--image_patches', default=0, type=int, help='Training data 
 parser.add_argument('--out_path', type=str, help='Output path for results')
 parser.add_argument('--data_path', type=str, help='Path containing training and val data')
 parser.add_argument('--resume_training', type=str, help='Resume training from checkpoint')
-parser.add_argument('--debug', action='store_true')
 
 # parser.add_argument('--Random_Seed', default=1, type=int, help='random seed number value (any integer value)')
 
@@ -74,15 +73,6 @@ if args.resume_training and Path(checkpoint_file.parent, 'arguments.json').exist
 
 patch_size = args.patch_size
 batch_size = args.batch_size
-
-if args.debug:
-    gpus = tf.config.experimental.list_physical_devices('GPU')
-
-    # Currently, memory growth needs to be the same across GPUs
-    for gpu in gpus:
-        tf.config.experimental.set_memory_growth(gpu, True)
-
-    # tf.config.experimental.set_virtual_device_configuration(gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=4096)])
 
 if args.data_path:
     data_path = Path(args.data_path)

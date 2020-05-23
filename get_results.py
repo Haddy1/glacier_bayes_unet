@@ -7,9 +7,9 @@ import pandas as pd
 import numpy as np
 from matplotlib import  pyplot as plt
 
-identifier = 'rotate'
+identifier = 'threshold'
 path = Path('output_' + identifier)
-out = Path('/home/andreas/thesis/reports/combined_loss')
+out = Path('/home/andreas/threshold')
 if not out.exists():
     out.mkdir()
 
@@ -22,9 +22,10 @@ for dir in path.iterdir():
     frames.append(pd.read_pickle(Path(dir, 'scores.pkl')))
 
 
-    arguments = json.load(open(Path(dir, 'arguments.json'), 'r'))
-    loss_split = arguments['loss_parms']
+    if Path(dir, 'arguments.json').exists():
+        arguments = json.load(open(Path(dir, 'arguments.json'), 'r'))
     if identifier == 'combined':
+        loss_split = arguments['loss_parms']
         label= str(loss_split['binary_crossentropy']) + '_' + str(loss_split['focal_loss'])
     elif identifier == 'filter':
         label = arguments['denoise']
@@ -35,10 +36,15 @@ for dir in path.iterdir():
                 label = 'nlmeans h=3'
     elif identifier == 'rotate':
         label = str(arguments['image_aug']['rotation_range'])
+    elif identifier == 'threshold':
+        label = dir.name
     labels.append(label)
     #all_results[denoise_filter] = results
 
-    copy(Path(dir, 'loss_plot.png'), Path(out, 'imgs', 'loss' + label + '.png'))
+    if Path(dir, 'loss_plot.png').exists():
+        copy(Path(dir, 'loss_plot.png'), Path(out, 'imgs', 'loss' + label + '.png'))
+    if not Path(out, 'imgs').exists():
+        Path(out, 'imgs').mkdir()
     copy(Path(dir, '2011-01-04_PALSAR_20_4.png'), Path(out, 'imgs', '2011-01-04_PALSAR_20_4_zones_' + identifier + '_' + label + '.png'))
     copy(Path(dir, '2006-10-18_ERS_20_4.png'), Path(out, 'imgs', '2006-10-18_ERS_20_4_zones_' + identifier + '_' + label + '.png'))
     #copy(Path(dir, 'loss_plot.png'), Path(out, 'loss' + denoise_filter + '.png'))
