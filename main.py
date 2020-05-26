@@ -87,12 +87,18 @@ else:
     out_path = Path('data_' + str(patch_size) + '/test/masks_predicted_' + time.strftime("%y%m%d-%H%M%S"))
 
 if args.image_patches:
-    if Path(data_path, 'patches').exists():
-        patches_path = Path(data_path, 'patches')
+    if Path(data_path, 'train/patches').exists():
+        patches_path_train = Path(data_path, 'train/patches')
     else:
-        patches_path = data_path
+        patches_path_train = Path(data_path,'train')
+
+    if Path(data_path, 'val/patches').exists():
+        patches_path_val = Path(data_path, 'val/patches')
+    else:
+        patches_path_val = Path(data_path,'val')
 else:
-    patches_path = Path(out_path, 'patches')
+    patches_path_train = Path(out_path, 'train/patches')
+    patches_path_val = Path(out_path, 'val/patches')
 
 if not out_path.exists():
     out_path.mkdir(parents=True)
@@ -111,25 +117,26 @@ if args.contrast:
     preprocessor.add_filter(clahe.apply)
 
 if not args.image_patches and not args.resume_training:
-    data_generator.process_data(Path(data_path, 'train'), Path(patches_path, 'train'), patch_size=patch_size,
+    data_generator.process_data(Path(data_path, 'train'), Path(patches_path_train), patch_size=patch_size,
                                 preprocessor=preprocessor)
-    data_generator.process_data(Path(data_path, 'val'), Path(patches_path, 'val'), patch_size=patch_size,
+    data_generator.process_data(Path(data_path, 'val'), Path(patches_path_val), patch_size=patch_size,
                                 preprocessor=preprocessor)
 
 # copy image file list to output
-for d in patches_path.iterdir():
-    if Path(d, 'image_list.json').exists():
-        copy(Path(d, 'image_list.json'), Path(out_path, d.name + '_image_list.json'))
+if Path(patches_path_train, 'image_list.json').exists():
+    copy(Path(patches_path_train, 'image_list.json'), Path(out_path, 'train_image_list.json'))
+if Path(patches_path_val, 'image_list.json').exists():
+    copy(Path(patches_path_val, 'image_list.json'), Path(out_path, 'val_image_list.json'))
 
 train_Generator = trainGenerator(batch_size=batch_size,
-                                 train_path=str(Path(patches_path, 'train')),
+                                 train_path=str(patches_path_train),
                                  image_folder='images',
                                  mask_folder='masks',
                                  aug_dict=args.image_aug,
                                  save_to_dir=None)
 
 val_Generator = trainGenerator(batch_size=batch_size,
-                               train_path=str(Path(patches_path, 'val')),
+                               train_path=str(patches_path_val),
                                image_folder='images',
                                mask_folder='masks',
                                aug_dict=None,
@@ -149,8 +156,8 @@ model_checkpoint = ModelCheckpoint(str(Path(out_path, 'unet_zone.hdf5')), monito
 early_stopping = EarlyStopping('val_loss', patience=args.patience, verbose=0, mode='auto', restore_best_weights=True)
 csv_logger = CSVLogger(str(Path(out_path, model.name + '_history.csv')), append=True)
 
-num_samples = len([file for file in Path(patches_path, 'train/images').rglob('*.png')])  # number of training samples
-num_val_samples = len([file for file in Path(patches_path, 'val/images').rglob('*.png')])  # number of val samples
+num_samples = len([file for file in Path(patches_path_train, 'images').rglob('*.png')])  # number of training samples
+num_val_samples = len([file for file in Path(patches_path_val, 'images').rglob('*.png')])  # number of val samples
 
 steps_per_epoch = np.ceil(num_samples / batch_size)
 validation_steps = np.ceil(num_val_samples / batch_size)
