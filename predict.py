@@ -42,6 +42,46 @@ def predict(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5
 
         io.imsave(Path(out_path, filename.name), mask_predicted.astype(np.uint8))
 
+def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 15):
+    if not Path(out_path).exists():
+        Path(out_path).mkdir(parents=True)
+
+    for filename in Path(img_path).rglob('*.png'):
+        print(filename)
+        img = io.imread(filename, as_gray=True)
+        if preprocessor is not None:
+            img = preprocessor.process(img)
+        img = img / 255
+        img_pad = cv2.copyMakeBorder(img, 0, (patch_size - img.shape[0]) % patch_size, 0, (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
+        p_img, i_img = extract_grayscale_patches(img_pad, (patch_size, patch_size), stride = (patch_size, patch_size))
+        p_img = np.reshape(p_img,p_img.shape+(1,))
+
+        predictions = []
+        for i in range(mc_iterations):
+            prediction = model.predict(p_img, batch_size=batch_size)
+            predictions.append(prediction)
+        predictions = np.array(predictions)
+
+
+        p_img_predicted = predictions.mean(axis=0)
+        p_img_predicted = np.reshape(p_img_predicted,p_img_predicted.shape[:-1])
+        mask_predicted = reconstruct_from_grayscale_patches(p_img_predicted,i_img)[0]
+        mask_predicted = mask_predicted[:img.shape[0], :img.shape[1]]
+
+        # thresholding to make binary mask
+        mask_predicted[mask_predicted < cutoff] = 0
+        mask_predicted[mask_predicted >= cutoff] = 255
+
+        io.imsave(Path(out_path, filename.name), mask_predicted.astype(np.uint8))
+
+        p_uncertainty = predictions.var(axis=0)
+        p_uncertainty = np.reshape(p_uncertainty,p_uncertainty.shape[:-1])
+        uncertainty = reconstruct_from_grayscale_patches(p_uncertainty,i_img)[0]
+        uncertainty_norm = uncertainty / uncertainty.max()
+        img_uncertainty = 255 * (1 - uncertainty_norm)
+        io.imsave(Path(out_path, filename.stem + 'uncertainty.png'), img_uncertainty.astype(np.uint8))
+
+
 def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, preprocessor=None):
     tmp_dir = Path(out_path, 'cutoff_tmp')
     dice = []
@@ -114,7 +154,10 @@ if __name__ is '__main__':
     if not out_path.exists():
         out_path.mkdir(parents=True)
 
-    predict(model, img_path, out_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
+    if 'bayes' in model_name:
+        predict_bayes(model, img_path, out_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
+    else:
+        predict(model, img_path, out_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
 
     if args.evaluate:
         evaluate(args.data_path, out_path)

@@ -225,7 +225,7 @@ def unet_Enze19_2(pretrained_weights = None,input_size = (256,256,1), loss_funct
 
     return model
 
-def unet_Enze19_2_Bayes(pretrained_weights = None,input_size = (256,256,1), loss_function = binary_crossentropy, drop_rate=0.5):
+def unet_Enze19_2_bayes(pretrained_weights = None,input_size = (256,256,1), loss_function = binary_crossentropy, drop_rate=0.5):
     # this model is based on the following paper by Enze Zhang et al.:
     # Automatically delineating the calving front of Jakobshavn Isbræ from multitemporal TerraSAR-X images: a deep learning approach
     inputs = Input(input_size)
