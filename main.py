@@ -194,20 +194,20 @@ os.remove(Path(str(out_path), 'unet_zone.hdf5'))
 if Path(out_path, 'patches').exists():
     rmtree(Path(out_path, 'patches'))
 
-if args.images_patches and not Path(data_path, 'patches').exists():
+if args.image_patches and not Path(data_path, 'val/patches').exists():
     print('Cannot optimize cutoff point since only patches of the validation images exist')
     cutoff = 0.5
 else:
     cutoff = get_cutoff_point(model, Path(data_path, 'val'), out_path, batch_size=batch_size, patch_size=patch_size, preprocessor=preprocessor)
     # resave arguments including cutoff point
     with open(Path(out_path, 'options.json'), 'w') as f:
-        args.__dict__['cutoff'] = resume_arg
+        args.__dict__['cutoff'] = cutoff
         f.write(json.dumps(vars(args)))
 
 test_path = str(Path(data_path, 'test'))
 
 predict(model, Path(test_path, 'images'), out_path, batch_size=batch_size, patch_size=patch_size, preprocessor=preprocessor, cutoff=cutoff)
-evaluate(test_path, out_path)
+evaluate.evaluate(test_path, out_path)
 
 END = time.time()
 print('Execution Time: ', END - START)
