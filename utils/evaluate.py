@@ -36,7 +36,7 @@ def evaluate(test_path, prediction_path):
 
 
         scores['image'].append(filename)
-        scores['dice'].append(f1_score(gt_flat, pred_flat))
+        scores['dice'].append(helper_functions.dice_coefficient(gt_flat, pred_flat))
         scores['euclidian'].append(distance.euclidean(gt_flat, pred_flat))
         scores['IOU'].append(helper_functions.IOU(gt_flat, pred_flat))
         scores['specificity'].append(helper_functions.specificity(gt_flat, pred_flat))
@@ -64,6 +64,24 @@ def evaluate(test_path, prediction_path):
 
     #pickle.dump(Perf, open(Path(prediction_path, 'scores.pkl'), 'wb'))
     scores.to_pickle(Path(prediction_path, 'scores.pkl'))
+    return scores
+
+def evaluate_dice_only(test_path, prediction_path):
+    dice = []
+    for filename in Path(test_path,'images').rglob('*.png'):
+        gt_path = str(Path(test_path,'masks'))
+        gt_name = filename.name.partition('.')[0] + '_zones.png'
+        gt = io.imread(str(Path(gt_path,gt_name)), as_gray=True)
+        pred = io.imread(Path(prediction_path,filename.name), as_gray=True)
+
+
+        gt = (gt > 200).astype(int)
+        pred = (pred > 200).astype(int)
+
+        gt_flat = gt.flatten()
+        pred_flat = pred.flatten()
+        dice.append(helper_functions.dice_coefficient(gt_flat, pred_flat))
+    return np.mean(dice)
 
 def plot_history(history, out_file, xlim=None, ylim=None):
     plt.figure()

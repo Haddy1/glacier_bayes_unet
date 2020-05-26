@@ -12,7 +12,7 @@ from keras.models import load_model
 import os
 
 from utils.data import trainGenerator
-from model import unet_Enze19_2
+import models
 from utils import helper_functions
 from loss_functions import *
 from keras.losses import *
@@ -20,6 +20,8 @@ from shutil import copy, rmtree
 import tensorflow as tf
 from preprocessing.preprocessor import Preprocessor
 from preprocessing import data_generator, filter
+from predict import predict, get_cutoff_point
+from utils import  evaluate
 
 # Hyper-parameter tuning
 parser = argparse.ArgumentParser(description='Glacier Front Segmentation')
@@ -48,6 +50,7 @@ parser.add_argument('--image_patches', default=0, type=int, help='Training data 
 parser.add_argument('--out_path', type=str, help='Output path for results')
 parser.add_argument('--data_path', type=str, help='Path containing training and val data')
 parser.add_argument('--resume_training', type=str, help='Resume training from checkpoint')
+parser.add_argument('--model', default='unet_Enze19_2', type=str, help='Training Model to use')
 
 # parser.add_argument('--Random_Seed', default=1, type=int, help='random seed number value (any integer value)')
 
@@ -64,12 +67,11 @@ if args.resume_training:
         print(checkpoint_file + ' does not exist')
         exit(-1)
 
-if args.resume_training and Path(checkpoint_file.parent, 'arguments.json').exists():
+if args.resume_training and Path(checkpoint_file.parent, 'options.json').exists():
     resume_arg = args.resume_training
     debug = args.debug
-    args.__dict__ = json.load(open(Path(checkpoint_file.parent, 'arguments.json'), 'r'))
+    args.__dict__ = json.load(open(Path(checkpoint_file.parent, 'options.json'), 'r'))
     args.__dict__['resume_training'] = resume_arg
-    args.__dict__['debug'] = debug
 
 patch_size = args.patch_size
 batch_size = args.batch_size
@@ -85,7 +87,10 @@ else:
     out_path = Path('data_' + str(patch_size) + '/test/masks_predicted_' + time.strftime("%y%m%d-%H%M%S"))
 
 if args.image_patches:
-    patches_path = data_path
+    if Path(data_path, 'patches').exists():
+        patches_path = Path(data_path, 'patches')
+    else:
+        patches_path = data_path
 else:
     patches_path = Path(out_path, 'patches')
 
@@ -93,7 +98,7 @@ if not out_path.exists():
     out_path.mkdir(parents=True)
 
 # log all arguments including default ones
-with open(Path(out_path, 'arguments.json'), 'w') as f:
+with open(Path(out_path, 'options.json'), 'w') as f:
     f.write(json.dumps(vars(args)))
 
 # Preprocessing
@@ -136,12 +141,13 @@ if args.resume_training:
 
     model = load_model(str(checkpoint_file.absolute()), custom_objects={'loss': loss_function})
 else:
-    model = unet_Enze19_2(loss_function=loss_function, input_size=(patch_size, patch_size, 1))
+    model_func = getattr(models, args.model)
+    model = model_func(loss_function=loss_function, input_size=(patch_size, patch_size, 1))
 
 model_checkpoint = ModelCheckpoint(str(Path(out_path, 'unet_zone.hdf5')), monitor='val_loss', verbose=0,
                                    save_best_only=True)
 early_stopping = EarlyStopping('val_loss', patience=args.patience, verbose=0, mode='auto', restore_best_weights=True)
-csv_logger = CSVLogger(str(Path(out_path, model.name + '_history,.csv')), append=True)
+csv_logger = CSVLogger(str(Path(out_path, model.name + '_history.csv')), append=True)
 
 num_samples = len([file for file in Path(patches_path, 'train/images').rglob('*.png')])  # number of training samples
 num_val_samples = len([file for file in Path(patches_path, 'val/images').rglob('*.png')])  # number of val samples
@@ -181,53 +187,19 @@ os.remove(Path(str(out_path), 'unet_zone.hdf5'))
 if Path(out_path, 'patches').exists():
     rmtree(Path(out_path, 'patches'))
 
-#####################
-#####################
-import skimage.io as io
-from utils.evaluate import evaluate
-from pathlib import Path
-from preprocessing.image_patches import extract_grayscale_patches, reconstruct_from_grayscale_patches
+if args.images_patches and not Path(data_path, 'patches').exists():
+    print('Cannot optimize cutoff point since only patches of the validation images exist')
+    cutoff = 0.5
+else:
+    cutoff = get_cutoff_point(model, Path(data_path, 'val'), out_path, batch_size=batch_size, patch_size=patch_size, preprocessor=preprocessor)
+    # resave arguments including cutoff point
+    with open(Path(out_path, 'options.json'), 'w') as f:
+        args.__dict__['cutoff'] = resume_arg
+        f.write(json.dumps(vars(args)))
 
 test_path = str(Path(data_path, 'test'))
 
-if not out_path:
-    out_path = Path('output')
-
-DICE_all = []
-EUCL_all = []
-Specificity_all = []
-Sensitivity_all = []
-F1_all = []
-test_file_names = []
-Perf = {}
-
-img_list = None
-
-for filename in Path(test_path, 'images').rglob('*.png'):
-    img = io.imread(filename, as_gray=True)
-    img = preprocessor.process(img)
-    img = img / 255
-    img_pad = cv2.copyMakeBorder(img, 0, (patch_size - img.shape[0]) % patch_size, 0,
-                                 (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
-    p_img, i_img = extract_grayscale_patches(img_pad, (patch_size, patch_size), stride=(patch_size, patch_size))
-    p_img = np.reshape(p_img, p_img.shape + (1,))
-
-    p_img_predicted = model.predict(p_img)
-
-    p_img_predicted = np.reshape(p_img_predicted, p_img_predicted.shape[:-1])
-    mask_predicted = reconstruct_from_grayscale_patches(p_img_predicted, i_img)[0]
-    mask_predicted = mask_predicted[:img.shape[0], :img.shape[1]]
-
-    # to 8 bit image
-    mask_predicted = cv2.normalize(src=mask_predicted, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX,
-                                   dtype=cv2.CV_8U)
-
-    # quantization to make the binary masks
-    mask_predicted[mask_predicted < 127] = 0
-    mask_predicted[mask_predicted >= 127] = 255
-
-    io.imsave(Path(str(out_path), Path(filename).name), mask_predicted)
-
+predict(model, Path(test_path, 'images'), out_path, batch_size=batch_size, patch_size=patch_size, preprocessor=preprocessor, cutoff=cutoff)
 evaluate(test_path, out_path)
 
 END = time.time()

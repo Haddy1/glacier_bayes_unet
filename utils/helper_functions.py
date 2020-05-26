@@ -1,7 +1,8 @@
 import numpy as np
 import argparse
 import keras.backend as K
-
+from pathlib import Path
+import matplotlib
 def dice_coefficient(u,v):
     """
     For binary vectors the Dice cooefficient can be written as
@@ -35,6 +36,15 @@ def IOU(y_true, y_pred):
     union = y_true.size
     return intersection / union
 
+def set_font_size(small=8, medium=10, bigger=12):
+    matplotlib.rc('font', size=small)          # controls default text sizes
+    matplotlib.rc('axes', titlesize=small)     # fontsize of the axes title
+    matplotlib.rc('axes', labelsize=medium)    # fontsize of the x and y labels
+    matplotlib.rc('xtick', labelsize=small)    # fontsize of the tick labels
+    matplotlib.rc('ytick', labelsize=small)    # fontsize of the tick labels
+    matplotlib.rc('legend', fontsize=small)    # legend fontsize
+    matplotlib.rc('figure', titlesize=bigger)  # fontsize of the figure title
+
 
 class StoreDictKeyPair(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
@@ -49,5 +59,7 @@ class StoreDictKeyPair(argparse.Action):
                 except ValueError:
                     my_dict[k] = v
         setattr(namespace, self.dest, my_dict)
+
+
 
 

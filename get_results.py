@@ -22,8 +22,8 @@ for dir in path.iterdir():
     frames.append(pd.read_pickle(Path(dir, 'scores.pkl')))
 
 
-    if Path(dir, 'arguments.json').exists():
-        arguments = json.load(open(Path(dir, 'arguments.json'), 'r'))
+    if Path(dir, 'options.json').exists():
+        arguments = json.load(open(Path(dir, 'options.json'), 'r'))
     if identifier == 'combined':
         loss_split = arguments['loss_parms']
         label= str(loss_split['binary_crossentropy']) + '_' + str(loss_split['focal_loss'])

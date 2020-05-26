@@ -79,21 +79,21 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
         json.dump(img_patch_index, f)
 
 
-def generate_subset(data_dir, out_dir, set_size=None, patch_size=256, preprocessor=None, augment=None):
+def generate_subset(data_dir, out_dir, set_size=None, patch_size=256, preprocessor=None, augment=None, patches_only=False):
     files_img = list(Path(data_dir, 'images').glob('*.png'))
     if set_size is not None:
         img_subset = random.sample(files_img, set_size)
     else:
         img_subset = files_img
 
-    if not Path(out_dir, 'images').exists():
-        Path(out_dir, 'images').mkdir(parents=True)
-    if not Path(out_dir, 'lines').exists():
-        Path(out_dir, 'lines').mkdir()
-    if not Path(out_dir, 'masks').exists():
-        Path(out_dir, 'masks').mkdir()
 
-    if patch_size is None:
+    if not patches_only:
+        if not Path(out_dir, 'images').exists():
+            Path(out_dir, 'images').mkdir(parents=True)
+        if not Path(out_dir, 'lines').exists():
+            Path(out_dir, 'lines').mkdir()
+        if not Path(out_dir, 'masks').exists():
+            Path(out_dir, 'masks').mkdir()
 
         for f in img_subset:
             print(f)
@@ -118,8 +118,8 @@ def generate_subset(data_dir, out_dir, set_size=None, patch_size=256, preprocess
                 cv2.imwrite(str(Path(out_dir, 'masks', basename + augmentation + '_zones.png')), mask_zones)
                 cv2.imwrite(str(Path(out_dir, 'lines', basename + augmentation + '_front.png')), mask_front)
 
-    else:
-        process_data(data_dir, out_dir, patch_size=patch_size, preprocessor=preprocessor, img_list=img_subset, augment=augment)
+    if patch_size is not None:
+        process_data(data_dir, Path(out_dir, 'patches'), patch_size=patch_size, preprocessor=preprocessor, img_list=img_subset, augment=augment)
 
 
 
@@ -129,10 +129,10 @@ if __name__ == "__main__":
 
     preprocessor = preprocessor.Preprocessor()
 
-    out_dir = Path('/home/andreas/glacier-front-detection/data_256')
+    out_dir = Path('/home/andreas/glacier-front-detection/data_256_small')
     data_dir = Path('/home/andreas/glacier-front-detection/front_detection_dataset')
 
 
-    generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patch_size=None)
-    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patch_size=patch_size)
-    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patch_size=patch_size)
+    generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patch_size=None, set_size=20)
+    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patch_size=patch_size,patches_only=True, set_size=50)
+    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), set_size=20)

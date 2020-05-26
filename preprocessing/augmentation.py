@@ -1,5 +1,5 @@
 import cv2
-def rotate_flip(img):
+def flip_rotate(img):
     imgs_out = []
     augmentations = ['', '_hflip', '_r90', '_r180', '_r270', '_hflip_r90', '_hflip_r180', '_hflip_r270']
     img_flip = cv2.flip(img, 0)
