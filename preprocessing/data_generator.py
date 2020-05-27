@@ -33,6 +33,9 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
             img = preprocessor.process(img)
         mask_front = cv2.imread(str(Path(in_dir, 'lines', basename + '_front.png')), cv2.IMREAD_GRAYSCALE)
         mask_zones = cv2.imread(str(Path(in_dir, 'masks', basename + '_zones.png')), cv2.IMREAD_GRAYSCALE)
+        img = cv2.copyMakeBorder(img, 0, (patch_size - img.shape[0]) % patch_size, 0, (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
+        mask_front = cv2.copyMakeBorder(mask_front, 0, (patch_size - mask_front.shape[0]) % patch_size, 0, (patch_size - mask_front.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
+        mask_zones = cv2.copyMakeBorder(mask_zones, 0, (patch_size - mask_zones.shape[0]) % patch_size, 0, (patch_size - mask_zones.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
 
 
 
@@ -129,10 +132,10 @@ if __name__ == "__main__":
 
     preprocessor = preprocessor.Preprocessor()
 
-    out_dir = Path('/home/andreas/glacier-front-detection/data_256_small')
+    out_dir = Path('/home/andreas/glacier-front-detection/data_256')
     data_dir = Path('/home/andreas/glacier-front-detection/front_detection_dataset')
 
 
-    generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patch_size=None, set_size=20)
-    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patch_size=patch_size,patches_only=True, set_size=50)
-    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), set_size=20)
+    generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patch_size=None)
+    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patch_size=patch_size,patches_only=True)
+    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patch_size=patch_size)
