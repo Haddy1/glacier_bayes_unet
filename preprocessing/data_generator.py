@@ -4,7 +4,6 @@ import cv2
 from preprocessing import image_patches, preprocessor,augmentation
 import json
 import random
-import shutil
 
 
 
