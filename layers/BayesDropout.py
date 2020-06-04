@@ -13,19 +13,12 @@ class BayesDropout(Dropout):
     super().__init__(rate, noise_shape=noise_shape, seed=seed, **kwargs)
 
   def call(self, inputs, training=None):
-    if training is None:
-      training = K.learning_phase()
 
-    def dropped_inputs():
-      return nn.dropout(
+    return nn.dropout(
           inputs,
           noise_shape=self._get_noise_shape(inputs),
           seed=self.seed,
           rate=self.rate)
 
-    output = tf_utils.smart_cond(training,
-                                 lambda: array_ops.identity(inputs),
-                                 dropped_inputs)
 
-    return output
 
