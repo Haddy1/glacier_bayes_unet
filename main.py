@@ -29,8 +29,8 @@ parser = argparse.ArgumentParser(description='Glacier Front Segmentation')
 
 parser.add_argument('--epochs', default=250, type=int, help='number of training epochs (integer value > 0)')
 parser.add_argument('--patience', default=10, type=int, help='how long to wait for improvements before Early_stopping')
-parser.add_argument('--batch_size', default=25, type=int, help='batch size (integer value)')
-parser.add_argument('--patch_size', default=256, type=int, help='batch size (integer value)')
+parser.add_argument('--batch_size', default=-1, type=int, help='batch size (integer value), if -1 set batch size according to available gpu memery')
+parser.add_argument('--patch_size', default=256, type=int, help='size of the image patches (patch_size x patch_size')
 
 parser.add_argument('--early_stopping', default=1, type=int,
                     help='If 1, classifier is using early stopping based on val loss with patience 20 (0/1)')
@@ -55,7 +55,7 @@ parser.add_argument('--model', default='unet_Enze19_2', type=str, help='Training
 parser.add_argument('--cyclic', default='None', type=str, help='Which cyclic learning policy to use', choices=['None', 'triangular', 'triangular2', 'exp_range' ])
 parser.add_argument('--cyclic-parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...",
                     help='dictionary with parameters for cyclic learning')
-
+parser.add_argument('--learning_rate', type=float, default=1e-4, help='Initial learning rate')
 # parser.add_argument('--Random_Seed', default=1, type=int, help='random seed number value (any integer value)')
 
 args = parser.parse_args()
@@ -78,7 +78,16 @@ if args.resume_training and Path(checkpoint_file.parent, 'options.json').exists(
     args.__dict__['resume_training'] = resume_arg
 
 patch_size = args.patch_size
-batch_size = args.batch_size
+
+if args.batch_size == -1:
+    gpu_mem = helper_functions.get_gpu_memory()[0]
+    if gpu_mem < 6000: batch_size = 4
+    elif gpu_mem < 10000: batch_size = 16
+    else: batch_size = 25
+    args.batch_size = batch_size
+else:
+    batch_size = args.batch_size
+
 
 if args.data_path:
     data_path = Path(args.data_path)

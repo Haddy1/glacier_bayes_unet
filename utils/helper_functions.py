@@ -1,6 +1,7 @@
 import numpy as np
 import argparse
 import keras.backend as K
+import subprocess as sp
 from pathlib import Path
 import matplotlib
 def dice_coefficient(u,v):
@@ -44,6 +45,16 @@ def set_font_size(small=8, medium=10, bigger=12):
     matplotlib.rc('ytick', labelsize=small)    # fontsize of the tick labels
     matplotlib.rc('legend', fontsize=small)    # legend fontsize
     matplotlib.rc('figure', titlesize=bigger)  # fontsize of the figure title
+
+def get_gpu_memory():
+  _output_to_list = lambda x: x.decode('ascii').split('\n')[:-1]
+
+  ACCEPTABLE_AVAILABLE_MEMORY = 1024
+  COMMAND = "nvidia-smi --query-gpu=memory.free --format=csv"
+  memory_free_info = _output_to_list(sp.check_output(COMMAND.split()))[1:]
+  memory_free_values = [int(x.split()[0]) for i, x in enumerate(memory_free_info)]
+  print(memory_free_values)
+  return memory_free_values
 
 
 class StoreDictKeyPair(argparse.Action):
