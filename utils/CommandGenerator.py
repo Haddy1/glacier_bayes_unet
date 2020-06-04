@@ -67,9 +67,6 @@ def addArgument(cmds, arg, value):
 
 cmds = [program]
 
-if debug:
-    cmds = [program + ' --debug']
-
 for arg, value in arguments.items():
     cmds = addArgument(cmds, arg, value)
 
