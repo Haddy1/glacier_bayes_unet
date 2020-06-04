@@ -5,6 +5,7 @@ from keras.models import load_model
 import pickle
 import argparse
 from loss_functions import *
+from layers.BayesDropout import  BayesDropout
 from preprocessing.preprocessor import Preprocessor
 from preprocessing import filter
 from keras.losses import binary_crossentropy
@@ -14,6 +15,7 @@ import cv2
 from utils.evaluate import evaluate, evaluate_dice_only
 from preprocessing.image_patches import extract_grayscale_patches, reconstruct_from_grayscale_patches
 import matplotlib.pyplot as plt
+import shutil
 
 def predict(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None):
     if not Path(out_path).exists():
@@ -42,7 +44,7 @@ def predict(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5
 
         io.imsave(Path(out_path, filename.name), mask_predicted.astype(np.uint8))
 
-def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 15):
+def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 50):
     if not Path(out_path).exists():
         Path(out_path).mkdir(parents=True)
 
@@ -77,6 +79,7 @@ def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cuto
         p_uncertainty = predictions.var(axis=0)
         p_uncertainty = np.reshape(p_uncertainty,p_uncertainty.shape[:-1])
         uncertainty = reconstruct_from_grayscale_patches(p_uncertainty,i_img)[0]
+        uncertainty = uncertainty[:img.shape[0], :img.shape[1]]
         uncertainty_norm = uncertainty / uncertainty.max()
         img_uncertainty = 255 * (1 - uncertainty_norm)
         io.imsave(Path(out_path, filename.stem + 'uncertainty.png'), img_uncertainty.astype(np.uint8))
@@ -99,6 +102,8 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, p
     plt.ylabel('Dice')
     plt.xlabel('Cutoff Point')
     plt.savefig(str(Path(out_path, 'cutoff.png')), bbox_inches='tight', format='png', dpi=200)
+
+    shutil.rmtree(tmp_dir, ignore_errors=True)
 
     return max_cutoff
 
@@ -138,7 +143,7 @@ if __name__ is '__main__':
 
     model_file = next(model_path.glob('model_*.h5'))
     model_name = model_file.name[6:-3]
-    model = load_model(str(model_file.absolute()), custom_objects={ 'loss': loss_function})
+    model = load_model(str(model_file.absolute()), custom_objects={ 'loss': loss_function, 'BayesDropout':BayesDropout})
     print(model_name)
 
     if args.cutoff:

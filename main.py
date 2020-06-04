@@ -10,6 +10,7 @@ import numpy as np
 from keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger
 from keras.models import load_model
 import os
+from CLR.clr_callback import CyclicLR
 
 from utils.data import trainGenerator
 import models
@@ -27,11 +28,11 @@ from utils import  evaluate
 parser = argparse.ArgumentParser(description='Glacier Front Segmentation')
 
 parser.add_argument('--epochs', default=250, type=int, help='number of training epochs (integer value > 0)')
-parser.add_argument('--patience', default=30, type=int, help='how long to wait for improvements before Early_stopping')
-parser.add_argument('--batch_size', default=100, type=int, help='batch size (integer value)')
+parser.add_argument('--patience', default=10, type=int, help='how long to wait for improvements before Early_stopping')
+parser.add_argument('--batch_size', default=25, type=int, help='batch size (integer value)')
 parser.add_argument('--patch_size', default=256, type=int, help='batch size (integer value)')
 
-parser.add_argument('--EARLY_STOPPING', default=1, type=int,
+parser.add_argument('--early_stopping', default=1, type=int,
                     help='If 1, classifier is using early stopping based on val loss with patience 20 (0/1)')
 parser.add_argument("--loss", help="loss function for the deep classifiers training ",
                     choices=["binary_crossentropy", "focal_loss", "combined_loss"], default="binary_crossentropy")
@@ -51,6 +52,9 @@ parser.add_argument('--out_path', type=str, help='Output path for results')
 parser.add_argument('--data_path', type=str, help='Path containing training and val data')
 parser.add_argument('--resume_training', type=str, help='Resume training from checkpoint')
 parser.add_argument('--model', default='unet_Enze19_2', type=str, help='Training Model to use')
+parser.add_argument('--cyclic', default='None', type=str, help='Which cyclic learning policy to use', choices=['None', 'triangular', 'triangular2', 'exp_range' ])
+parser.add_argument('--cyclic-parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...",
+                    help='dictionary with parameters for cyclic learning')
 
 # parser.add_argument('--Random_Seed', default=1, type=int, help='random seed number value (any integer value)')
 
@@ -151,13 +155,38 @@ else:
     model_func = getattr(models, args.model)
     model = model_func(loss_function=loss_function, input_size=(patch_size, patch_size, 1))
 
-model_checkpoint = ModelCheckpoint(str(Path(out_path, 'unet_zone.hdf5')), monitor='val_loss', verbose=0,
+model_checkpoint = ModelCheckpoint(str(Path(out_path, model.name + '_checkpoint.hdf5')), monitor='val_loss', verbose=0,
                                    save_best_only=True)
-early_stopping = EarlyStopping('val_loss', patience=args.patience, verbose=0, mode='auto', restore_best_weights=True)
-csv_logger = CSVLogger(str(Path(out_path, model.name + '_history.csv')), append=True)
+
 
 num_samples = len([file for file in Path(patches_path_train, 'images').rglob('*.png')])  # number of training samples
 num_val_samples = len([file for file in Path(patches_path_val, 'images').rglob('*.png')])  # number of val samples
+
+callbacks = []
+callbacks.append(CSVLogger(str(Path(out_path, model.name + '_history.csv')), append=True))
+
+if args.early_stopping:
+    callbacks.append(EarlyStopping('val_loss', patience=args.patience, verbose=0, mode='auto', restore_best_weights=True))
+
+if args.cyclic is not 'None':
+    if args.cyclic_parms is not None:
+        cyclic_parms = args.cyclic_parms
+    else:
+        cyclic_parms = {}
+    if not 'base_lr' in cyclic_parms:
+        cyclic_parms['base_lr'] = 1e-4
+    if not 'max_lr' in cyclic_parms:
+        cyclic_parms['max_lr'] = 6e-4
+    if not 'step_size' in cyclic_parms:
+        cyclic_parms['step_size'] = int(4 * num_samples / batch_size)
+    clr = CyclicLR(mode=args.cyclic, base_lr=cyclic_parms['base_lr'], max_lr=cyclic_parms['max_lr'], step_size=cyclic_parms['step_size'])
+    callbacks.append(clr)
+    args.__dict__['cyclic_parms'] = cyclic_parms # save changes in options
+    # Update options file
+    with open(Path(out_path, 'options.json'), 'w') as f:
+        f.write(json.dumps(vars(args))) # Update options file
+
+
 
 steps_per_epoch = np.ceil(num_samples / batch_size)
 validation_steps = np.ceil(num_val_samples / batch_size)
@@ -166,7 +195,7 @@ history = model.fit_generator(train_Generator,
                               epochs=args.epochs,
                               validation_data=val_Generator,
                               validation_steps=validation_steps,
-                              callbacks=[model_checkpoint, early_stopping, csv_logger])
+                              callbacks=callbacks)
 
 # # save model
 model.save(str(Path(out_path, 'model_' + model.name + '.h5').absolute()))
@@ -190,7 +219,9 @@ plt.savefig(str(Path(str(out_path), 'loss_plot.png')), bbox_inches='tight', form
 plt.show()
 
 # Cleanup
-os.remove(Path(str(out_path), 'unet_zone.hdf5'))
+
+if Path(out_path, model.name + '_checkpoint.hdf5').exists():
+    os.remove(Path(out_path, model.name + '_checkpoint.hdf5'))
 if Path(out_path, 'patches').exists():
     rmtree(Path(out_path, 'patches'))
 
