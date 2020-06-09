@@ -1,5 +1,6 @@
 import skimage.io as io
 from pathlib import Path
+import seaborn as sns
 from scipy.spatial import distance
 import numpy as np
 from sklearn.metrics import f1_score, recall_score
@@ -9,7 +10,8 @@ import pandas as pd
 from matplotlib import pyplot as plt
 import json
 
-def evaluate(test_path, prediction_path):
+
+def evaluate(img_path, gt_path, prediction_path):
 
     #scores = pd.DataFrame(columns=['image', 'dice'])
     scores = {}
@@ -19,28 +21,45 @@ def evaluate(test_path, prediction_path):
     scores['IOU'] = []
     scores['specificity'] = []
     scores['sensitivity'] = []
+    scores['uncertainty_mean'] = []
+    scores['uncertainty_var'] = []
 
-    for filename in Path(test_path,'images').rglob('*.png'):
+    for filename in Path(img_path).rglob('*.png'):
 
-        gt_path = str(Path(test_path,'masks'))
         gt_name = filename.name.partition('.')[0] + '_zones.png'
-        gt = io.imread(str(Path(gt_path,gt_name)), as_gray=True)
-        pred = io.imread(Path(prediction_path,filename.name), as_gray=True)
+        gt_img = io.imread(str(Path(gt_path,gt_name)), as_gray=True)
+        if (Path(prediction_path, filename.stem + '_pred.png')).exists():
+            pred_img = io.imread(Path(prediction_path, filename.stem + '_pred.png'), as_gray=True)
+        else:
+            pred_img = io.imread(Path(prediction_path,filename.name), as_gray=True) # Legacy before predictions got pred indentifier
 
 
-        gt = (gt > 200).astype(int)
-        pred = (pred > 200).astype(int)
+        gt = (gt_img > 200).astype(int)
+        pred = (pred_img > 200).astype(int)
 
         gt_flat = gt.flatten()
         pred_flat = pred.flatten()
 
 
-        scores['image'].append(filename)
+        scores['image'].append(filename.name)
         scores['dice'].append(helper_functions.dice_coefficient(gt_flat, pred_flat))
         scores['euclidian'].append(distance.euclidean(gt_flat, pred_flat))
         scores['IOU'].append(helper_functions.IOU(gt_flat, pred_flat))
         scores['specificity'].append(helper_functions.specificity(gt_flat, pred_flat))
         scores['sensitivity'].append(recall_score(gt_flat, pred_flat))
+
+        if Path(prediction_path, filename.stem + '_uncertainty.png').exists():
+            uncertainty_img = io.imread(Path(prediction_path, filename.stem + '_uncertainty.png'), as_gray=True)
+            uncertainty = uncertainty_img / 65535
+            scores['uncertainty_mean'].append(uncertainty.mean())
+            scores['uncertainty_var'].append(uncertainty.var())
+            plt.figure()
+            sns.heatmap(uncertainty, vmin=0, vmax=0.15, xticklabels=False, yticklabels=False)
+            plt.savefig(Path(prediction_path, filename.stem + '_heatmap.png'), bbox_inches='tight', format='png', dpi=300)
+            plt.close()
+
+            diff = 255 * (gt != pred).astype(np.uint8)
+            io.imsave(Path(prediction_path, filename.stem + '_diff.png'), diff)
 
 
     scores = pd.DataFrame(scores)
@@ -65,6 +84,7 @@ def evaluate(test_path, prediction_path):
     #pickle.dump(Perf, open(Path(prediction_path, 'scores.pkl'), 'wb'))
     scores.to_pickle(Path(prediction_path, 'scores.pkl'))
     return scores
+
 
 def evaluate_dice_only(test_path, prediction_path):
     dice = []
@@ -100,9 +120,18 @@ def plot_history(history, out_file, xlim=None, ylim=None):
     plt.savefig(out_file, bbox_inches='tight', format='png', dpi=200)
     plt.show()
 
+def eval_uncertainty(file, out_file, vmin=0, vmax=0.2):
+    uncertainty = np.load(file)
+    plt.figure()
+    sns.heatmap(uncertainty, vmin=vmin, vmax=vmax, xticklabels=False, yticklabels=False)
+    plt.savefig(out_file, bbox_inches='tight', format='png', dpi=200)
+
 if __name__ is '__main__':
-    for d in Path('/home/andreas/glacier-front-detection/output_filter').iterdir():
-        if d.is_dir():
-            evaluate(Path('/home/andreas/glacier-front-detection/front_detection_dataset/test'), d)
-            history = pickle.load(open(next(d.glob('history*.pkl')), 'rb'))
-            plot_history(history, Path(d, 'loss_plot.png') , xlim=(-10,250), ylim=(0,1.0))
+    path = Path('/home/andreas/glacier-front-detection/test_all_drop')
+    test_path = Path('/home/andreas/glacier-front-detection/front_detection_dataset/test')
+    evaluate(Path(test_path, 'images'), Path(test_path, 'masks'), path)
+    #for d in Path('/home/andreas/glacier-front-detection/output_combined').iterdir():
+    #    if d.is_dir():
+    #        evaluate(Path('/home/andreas/glacier-front-detection/front_detection_dataset/test'), d)
+    #        history = pickle.load(open(next(d.glob('history*.pkl')), 'rb'))
+    #        plot_history(history, Path(d, 'loss_plot.png') , xlim=(-10,150), ylim=(0,0.5))

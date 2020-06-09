@@ -7,9 +7,10 @@ import pandas as pd
 import numpy as np
 from matplotlib import  pyplot as plt
 
-identifier = 'threshold'
+plt.rcParams.update({'font.size': 18})
+identifier = 'bayes'
 path = Path('output_' + identifier)
-out = Path('/home/andreas/threshold')
+out = Path('/home/andreas/thesis/reports/bayes_network')
 if not out.exists():
     out.mkdir()
 
@@ -36,8 +37,9 @@ for dir in path.iterdir():
                 label = 'nlmeans h=3'
     elif identifier == 'rotate':
         label = str(arguments['image_aug']['rotation_range'])
-    elif identifier == 'threshold':
+    else:
         label = dir.name
+
     labels.append(label)
     #all_results[denoise_filter] = results
 
@@ -45,13 +47,13 @@ for dir in path.iterdir():
         copy(Path(dir, 'loss_plot.png'), Path(out, 'imgs', 'loss' + label + '.png'))
     if not Path(out, 'imgs').exists():
         Path(out, 'imgs').mkdir()
-    copy(Path(dir, '2011-01-04_PALSAR_20_4.png'), Path(out, 'imgs', '2011-01-04_PALSAR_20_4_zones_' + identifier + '_' + label + '.png'))
-    copy(Path(dir, '2006-10-18_ERS_20_4.png'), Path(out, 'imgs', '2006-10-18_ERS_20_4_zones_' + identifier + '_' + label + '.png'))
+    #copy(Path(dir, '2011-01-04_PALSAR_20_4.png'), Path(out, 'imgs', '2011-01-04_PALSAR_20_4_zones_' + identifier + '_' + label + '.png'))
+    #copy(Path(dir, '2006-10-18_ERS_20_4.png'), Path(out, 'imgs', '2006-10-18_ERS_20_4_zones_' + identifier + '_' + label + '.png'))
     #copy(Path(dir, 'loss_plot.png'), Path(out, 'loss' + denoise_filter + '.png'))
 
 scores = pd.concat(frames, keys = labels)
-scores = scores.sort_index(ascending=True)
-labels = sorted(labels, reverse=False)
+scores = scores.sort_index(ascending=False)
+labels = sorted(labels, reverse=True)
 
 def fperc(x):
     return str(round(x * 100,2))
@@ -91,14 +93,19 @@ for column in scores.keys():
 
     if (column == 'euclidian'):
         plt.hist(score, bins=np.linspace(0, max, 6))
+    elif 'uncertainty' in column:
+        plt.hist(score, bins=np.linspace(0, 0.004, 6))
     else:
-        plt.hist(score, bins=np.linspace(0,1, 6))
+        plt.hist(score, bins=np.linspace(0.4,1,7))
     plt.legend(labels)
 
     if (column == 'euclidian'):
         plt.xticks(np.linspace(0, max, 6))
+    elif 'uncertainty' in column:
+        plt.ticklabel_format(axis='x', style='sci', scilimits=(0,0))
+        plt.xticks(np.linspace(0, 0.004, 6))
     else:
-        plt.xticks(np.arange(0,1, 0.2))
+        plt.xticks(np.arange(0.4,1, 0.1))
     ax.set_ylabel('Score Count')
     ax.set_xlabel('Score')
     plt.title(column)

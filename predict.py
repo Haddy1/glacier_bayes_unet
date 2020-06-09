@@ -1,5 +1,6 @@
 import sys
 import json
+import seaborn as sns
 from pathlib import Path
 from keras.models import load_model
 import pickle
@@ -42,7 +43,7 @@ def predict(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5
         mask_predicted[mask_predicted < cutoff] = 0
         mask_predicted[mask_predicted >= cutoff] = 255
 
-        io.imsave(Path(out_path, filename.name), mask_predicted.astype(np.uint8))
+        io.imsave(Path(out_path, filename.stem + '_pred.png'), mask_predicted.astype(np.uint8))
 
 def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 50):
     if not Path(out_path).exists():
@@ -70,19 +71,22 @@ def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cuto
         mask_predicted = reconstruct_from_grayscale_patches(p_img_predicted,i_img)[0]
         mask_predicted = mask_predicted[:img.shape[0], :img.shape[1]]
 
+        mask_predicted_img = (65535 * mask_predicted).astype(np.uint16)
+        cv2.imwrite(str(Path(out_path, filename.stem + '_pred_perc.png')), mask_predicted_img)
+
         # thresholding to make binary mask
         mask_predicted[mask_predicted < cutoff] = 0
         mask_predicted[mask_predicted >= cutoff] = 255
 
-        io.imsave(Path(out_path, filename.name), mask_predicted.astype(np.uint8))
+        io.imsave(Path(out_path, filename.stem + '_pred.png'), mask_predicted.astype(np.uint8))
 
         p_uncertainty = predictions.var(axis=0)
         p_uncertainty = np.reshape(p_uncertainty,p_uncertainty.shape[:-1])
         uncertainty = reconstruct_from_grayscale_patches(p_uncertainty,i_img)[0]
         uncertainty = uncertainty[:img.shape[0], :img.shape[1]]
-        uncertainty_norm = uncertainty / uncertainty.max()
-        img_uncertainty = 255 * (1 - uncertainty_norm)
-        io.imsave(Path(out_path, filename.stem + 'uncertainty.png'), img_uncertainty.astype(np.uint8))
+        uncertainty_img = (65535 * uncertainty).astype(np.uint16)
+        cv2.imwrite(str(Path(out_path, filename.stem + '_uncertainty.png')), uncertainty_img)
+        #np.save(Path(out_path, filename.stem + '_uncertainty.npy'), uncertainty)
 
 
 def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, preprocessor=None):
@@ -110,17 +114,12 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, p
 if __name__ is '__main__':
     parser = argparse.ArgumentParser(description='Glacier Front Segmentation Prediction')
     parser.add_argument('--model_path', type=str, help='Path containing trained model')
-    parser.add_argument('--data_path', type=str, help='Path containing trained model')
+    parser.add_argument('--img_path', type=str, help='Path containing images to be segmented')
     parser.add_argument('--out_path', type=str, help='output path for predictions')
-    parser.add_argument('--evaluate', action='store_true', help='evaluate model - requires data_path with labeled data')
+    parser.add_argument('--gt_path', type=str, help='Path containing the ground truth, necessary for evaluation')
     parser.add_argument('--batch_size', default=1, type=int, help='batch size (integer value)')
     parser.add_argument('--cutoff', type=float, help='cutoff point of binarisation')
     args = parser.parse_args()
-
-    if args.evaluate:
-        img_path = Path(args.data_path, 'images')
-    else:
-        img_path = Path(args.data_path)
 
     model_path = Path(args.model_path)
     options = json.load(open(Path(model_path, 'options.json'), 'r'))
@@ -160,10 +159,10 @@ if __name__ is '__main__':
         out_path.mkdir(parents=True)
 
     if 'bayes' in model_name:
-        predict_bayes(model, img_path, out_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
+        predict_bayes(model, args.img_path, out_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
     else:
-        predict(model, img_path, out_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
+        predict(model, args.img_path, out_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
 
-    if args.evaluate:
-        evaluate(args.data_path, out_path)
+    if args.gt_path:
+        evaluate(args.img_path, args.gt_path, out_path)
 
