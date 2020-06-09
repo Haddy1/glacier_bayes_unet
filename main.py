@@ -164,15 +164,17 @@ else:
     model_func = getattr(models, args.model)
     model = model_func(loss_function=loss_function, input_size=(patch_size, patch_size, 1))
 
+callbacks = []
+callbacks.append(CSVLogger(str(Path(out_path, model.name + '_history.csv')), append=True))
+
 model_checkpoint = ModelCheckpoint(str(Path(out_path, model.name + '_checkpoint.hdf5')), monitor='val_loss', verbose=0,
                                    save_best_only=True)
 
+callbacks.append(model_checkpoint)
 
 num_samples = len([file for file in Path(patches_path_train, 'images').rglob('*.png')])  # number of training samples
 num_val_samples = len([file for file in Path(patches_path_val, 'images').rglob('*.png')])  # number of val samples
 
-callbacks = []
-callbacks.append(CSVLogger(str(Path(out_path, model.name + '_history.csv')), append=True))
 
 if args.early_stopping:
     callbacks.append(EarlyStopping('val_loss', patience=args.patience, verbose=0, mode='auto', restore_best_weights=True))
