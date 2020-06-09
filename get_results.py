@@ -8,9 +8,9 @@ import numpy as np
 from matplotlib import  pyplot as plt
 
 plt.rcParams.update({'font.size': 18})
-identifier = 'bayes'
+identifier = 'combined'
 path = Path('output_' + identifier)
-out = Path('/home/andreas/thesis/reports/bayes_network')
+out = Path('/home/andreas/thesis/reports/combined_loss')
 if not out.exists():
     out.mkdir()
 
@@ -47,12 +47,14 @@ for dir in path.iterdir():
         copy(Path(dir, 'loss_plot.png'), Path(out, 'imgs', 'loss' + label + '.png'))
     if not Path(out, 'imgs').exists():
         Path(out, 'imgs').mkdir()
-    #copy(Path(dir, '2011-01-04_PALSAR_20_4.png'), Path(out, 'imgs', '2011-01-04_PALSAR_20_4_zones_' + identifier + '_' + label + '.png'))
-    #copy(Path(dir, '2006-10-18_ERS_20_4.png'), Path(out, 'imgs', '2006-10-18_ERS_20_4_zones_' + identifier + '_' + label + '.png'))
+    copy(Path(dir, '2011-01-04_PALSAR_20_4.png'), Path(out, 'imgs', '2011-01-04_PALSAR_20_4_zones_' + identifier + '_' + label + '.png'))
+    copy(Path(dir, '2006-10-18_ERS_20_4.png'), Path(out, 'imgs', '2006-10-18_ERS_20_4_zones_' + identifier + '_' + label + '.png'))
     #copy(Path(dir, 'loss_plot.png'), Path(out, 'loss' + denoise_filter + '.png'))
 
 scores = pd.concat(frames, keys = labels)
 scores = scores.sort_index(ascending=False)
+scores.to_pickle(Path(out, identifier + '_all_scores.pkl'))
+#%%
 labels = sorted(labels, reverse=True)
 
 def fperc(x):

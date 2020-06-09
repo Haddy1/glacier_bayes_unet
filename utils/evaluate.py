@@ -103,7 +103,7 @@ def evaluate_dice_only(test_path, prediction_path):
         dice.append(helper_functions.dice_coefficient(gt_flat, pred_flat))
     return np.mean(dice)
 
-def plot_history(history, out_file, xlim=None, ylim=None):
+def plot_history(history, out_file, xlim=None, ylim=None, title=None):
     plt.figure()
     plt.rcParams.update({'font.size': 18})
     plt.plot( history['loss'], 'X-', label='training loss', linewidth=4.0)
@@ -114,6 +114,8 @@ def plot_history(history, out_file, xlim=None, ylim=None):
         plt.ylim(ylim)
     plt.xlabel('epoch')
     plt.ylabel('loss')
+    if title:
+        plt.title(title)
     plt.legend(loc='upper right')
     plt.minorticks_on()
     plt.grid(which='minor', linestyle='--')
@@ -127,11 +129,14 @@ def eval_uncertainty(file, out_file, vmin=0, vmax=0.2):
     plt.savefig(out_file, bbox_inches='tight', format='png', dpi=200)
 
 if __name__ is '__main__':
-    path = Path('/home/andreas/glacier-front-detection/test_all_drop')
+    path = Path('/home/andreas/glacier-front-detection/output_bayes/no_bayes')
     test_path = Path('/home/andreas/glacier-front-detection/front_detection_dataset/test')
-    evaluate(Path(test_path, 'images'), Path(test_path, 'masks'), path)
-    #for d in Path('/home/andreas/glacier-front-detection/output_combined').iterdir():
+    history = pickle.load(open(next(path.glob('history*.pkl')), 'rb'))
+    plot_history(history, Path(path, 'loss_plot.png') , xlim=(-10,120), ylim=(0,1.5), title='Regular Unet')
+
+    #evaluate(Path(test_path, 'images'), Path(test_path, 'masks'), path)
+    #for d in Path('/home/andreas/glacier-front-detection/output_bayes').iterdir():
     #    if d.is_dir():
-    #        evaluate(Path('/home/andreas/glacier-front-detection/front_detection_dataset/test'), d)
+    #        #evaluate(Path('/home/andreas/glacier-front-detection/front_detection_dataset/test'), d)
     #        history = pickle.load(open(next(d.glob('history*.pkl')), 'rb'))
-    #        plot_history(history, Path(d, 'loss_plot.png') , xlim=(-10,150), ylim=(0,0.5))
+    #        plot_history(history, Path(d, 'loss_plot.png') , xlim=(-10,120), ylim=(0,1.5))
