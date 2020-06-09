@@ -228,11 +228,11 @@ plt.savefig(str(Path(str(out_path), 'loss_plot.png')), bbox_inches='tight', form
 plt.show()
 
 # Cleanup
-
-if Path(out_path, model.name + '_checkpoint.hdf5').exists():
-    os.remove(Path(out_path, model.name + '_checkpoint.hdf5'))
-if Path(out_path, 'patches').exists():
-    rmtree(Path(out_path, 'patches'))
+if Path(out_path, 'model_' + model.name + '.h5').exists(): # Only cleanup if finished training model exists
+    if Path(out_path, model.name + '_checkpoint.hdf5').exists():
+        os.remove(Path(out_path, model.name + '_checkpoint.hdf5'))
+    if Path(out_path, 'patches').exists():
+        rmtree(Path(out_path, 'patches'))
 
 if args.image_patches and not Path(data_path, 'val/patches').exists():
     print('Cannot optimize cutoff point since only patches of the validation images exist')
