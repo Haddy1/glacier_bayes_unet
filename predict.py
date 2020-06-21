@@ -50,7 +50,7 @@ def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cuto
         Path(out_path).mkdir(parents=True)
 
     for filename in Path(img_path).rglob('*.png'):
-        print(filename)
+        #print(filename)
         img = io.imread(filename, as_gray=True)
         if preprocessor is not None:
             img = preprocessor.process(img)

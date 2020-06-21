@@ -10,3 +10,10 @@ def flip_rotate(img):
         imgs_out.append(cv2.rotate(img_, cv2.ROTATE_90_CLOCKWISE))
 
     return imgs_out, augmentations
+def flip(img):
+    imgs_out = []
+    augmentations = ['', '_hflip']
+    imgs_out.append(img)
+    imgs_out.append(cv2.flip(img, 0))
+
+    return imgs_out, augmentations

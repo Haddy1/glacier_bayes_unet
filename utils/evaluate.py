@@ -21,8 +21,6 @@ def evaluate(img_path, gt_path, prediction_path):
     scores['IOU'] = []
     scores['specificity'] = []
     scores['sensitivity'] = []
-    scores['uncertainty_mean'] = []
-    scores['uncertainty_var'] = []
 
     for filename in Path(img_path).rglob('*.png'):
 
@@ -49,6 +47,10 @@ def evaluate(img_path, gt_path, prediction_path):
         scores['sensitivity'].append(recall_score(gt_flat, pred_flat))
 
         if Path(prediction_path, filename.stem + '_uncertainty.png').exists():
+            if not 'uncertainty_mean' in scores:
+                scores['uncertainty_mean'] = []
+                scores['uncertainty_var'] = []
+
             uncertainty_img = io.imread(Path(prediction_path, filename.stem + '_uncertainty.png'), as_gray=True)
             uncertainty = uncertainty_img / 65535
             scores['uncertainty_mean'].append(uncertainty.mean())
@@ -91,12 +93,15 @@ def evaluate_dice_only(test_path, prediction_path):
     for filename in Path(test_path,'images').rglob('*.png'):
         gt_path = str(Path(test_path,'masks'))
         gt_name = filename.name.partition('.')[0] + '_zones.png'
-        gt = io.imread(str(Path(gt_path,gt_name)), as_gray=True)
-        pred = io.imread(Path(prediction_path,filename.name), as_gray=True)
+        gt_img = io.imread(str(Path(gt_path,gt_name)), as_gray=True)
+        if (Path(prediction_path, filename.stem + '_pred.png')).exists():
+            pred_img = io.imread(Path(prediction_path, filename.stem + '_pred.png'), as_gray=True)
+        else:
+            pred_img = io.imread(Path(prediction_path,filename.name), as_gray=True) # Legacy before predictions got pred indentifier
 
 
-        gt = (gt > 200).astype(int)
-        pred = (pred > 200).astype(int)
+        gt = (gt_img > 200).astype(int)
+        pred = (pred_img > 200).astype(int)
 
         gt_flat = gt.flatten()
         pred_flat = pred.flatten()

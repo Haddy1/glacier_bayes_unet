@@ -240,6 +240,7 @@ if args.image_patches and not Path(data_path, 'val/patches').exists():
     print('Cannot optimize cutoff point since only patches of the validation images exist')
     cutoff = 0.5
 else:
+    print("Finding optimal cutoff point")
     cutoff = get_cutoff_point(model, Path(data_path, 'val'), out_path, batch_size=batch_size, patch_size=patch_size, preprocessor=preprocessor)
     # resave arguments including cutoff point
     with open(Path(out_path, 'options.json'), 'w') as f:
@@ -249,7 +250,7 @@ else:
 test_path = str(Path(data_path, 'test'))
 
 predict(model, Path(test_path, 'images'), out_path, batch_size=batch_size, patch_size=patch_size, preprocessor=preprocessor, cutoff=cutoff)
-evaluate.evaluate(test_path, out_path)
+evaluate.evaluate(Path(test_path, 'images'), Path(test_path, 'masks'), out_path)
 
 END = time.time()
 print('Execution Time: ', END - START)
