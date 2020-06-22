@@ -81,12 +81,25 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
         json.dump(img_patch_index, f)
 
 
-def generate_subset(data_dir, out_dir, set_size=None, patch_size=256, preprocessor=None, augment=None, patches_only=False):
-    files_img = list(Path(data_dir, 'images').glob('*.png'))
+def generate_subset(data_dir, out_dir, set_size=None, patch_size=256, preprocessor=None, augment=None, patches_only=False, split=None, img_list=None):
+    if img_list is not None:
+        files_img = img_list
+    else:
+        files_img = list(Path(data_dir, 'images').glob('*.png'))
+
     if set_size is not None:
         img_subset = random.sample(files_img, set_size)
     else:
         img_subset = files_img
+
+    if split is not None:
+        img_subset = random.shuffle(img_subset)
+        split_point = int(split * len(img_subset))
+        set1 = img_subset[:split_point]
+        set2 = img_subset[split_point:]
+        out_dir = Path(out_dir)
+        process_data(None, Path(out_dir.parent, out_dir.name + "_1"), patch_size=patch_size, preprocessor=preprocessor, img_list=set1, augment=augment)
+        process_data(None, Path(out_dir.parent, out_dir.name + "_2"), patch_size=patch_size, preprocessor=preprocessor, img_list=set2, augment=augment)
 
 
     if not patches_only:
@@ -131,10 +144,10 @@ if __name__ == "__main__":
 
     preprocessor = preprocessor.Preprocessor()
 
-    out_dir = Path('/home/andreas/glacier-front-detection/data_256')
+    out_dir = Path('/home/andreas/glacier-front-detection/data_256_attention')
     data_dir = Path('/home/andreas/glacier-front-detection/front_detection_dataset')
 
 
     generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patch_size=None)
-    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patch_size=patch_size,patches_only=True)
-    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patch_size=patch_size)
+    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patch_size=patch_size,patches_only=True, split=0.5)
+    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patch_size=patch_size, split=0.5)
