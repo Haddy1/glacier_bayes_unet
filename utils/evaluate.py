@@ -106,7 +106,7 @@ def evaluate_dice_only(test_path, prediction_path):
         gt_flat = gt.flatten()
         pred_flat = pred.flatten()
         dice.append(helper_functions.dice_coefficient(gt_flat, pred_flat))
-    return np.mean(dice)
+    return dice
 
 def plot_history(history, out_file, xlim=None, ylim=None, title=None):
     plt.figure()
@@ -134,12 +134,13 @@ def eval_uncertainty(file, out_file, vmin=0, vmax=0.2):
     plt.savefig(out_file, bbox_inches='tight', format='png', dpi=200)
 
 if __name__ is '__main__':
-    path = Path('/home/andreas/glacier-front-detection/output_bayes/no_bayes')
+    path = Path('/home/andreas/glacier-front-detection/output_attention')
     test_path = Path('/home/andreas/glacier-front-detection/front_detection_dataset/test')
-    history = pickle.load(open(next(path.glob('history*.pkl')), 'rb'))
-    plot_history(history, Path(path, 'loss_plot.png') , xlim=(-10,120), ylim=(0,1.5), title='Regular Unet')
+    #history = pickle.load(open(next(path.glob('history*.pkl')), 'rb'))
+    history = pd.read_csv(Path(path,'model_1_history.csv'))
+    plot_history(history, Path(path, 'loss_plot.png') , xlim=(-10,30), ylim=(0,0.75), title='Set1')
 
-    #evaluate(Path(test_path, 'images'), Path(test_path, 'masks'), path)
+    evaluate(Path(test_path, 'images'), Path(test_path, 'masks'), path)
     #for d in Path('/home/andreas/glacier-front-detection/output_bayes').iterdir():
     #    if d.is_dir():
     #        #evaluate(Path('/home/andreas/glacier-front-detection/front_detection_dataset/test'), d)

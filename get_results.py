@@ -8,11 +8,11 @@ import numpy as np
 from matplotlib import  pyplot as plt
 
 plt.rcParams.update({'font.size': 18})
-identifier = 'combined'
+identifier = 'flip'
 path = Path('output_' + identifier)
-out = Path('/home/andreas/thesis/reports/combined_loss')
+out = Path('/home/andreas/thesis/reports/combined_loss_flip')
 if not out.exists():
-    out.mkdir()
+    out.mkdir(parents=True)
 
 all_results = {}
 frames = []
@@ -43,12 +43,12 @@ for dir in path.iterdir():
     labels.append(label)
     #all_results[denoise_filter] = results
 
-    if Path(dir, 'loss_plot.png').exists():
-        copy(Path(dir, 'loss_plot.png'), Path(out, 'imgs', 'loss' + label + '.png'))
     if not Path(out, 'imgs').exists():
         Path(out, 'imgs').mkdir()
-    copy(Path(dir, '2011-01-04_PALSAR_20_4.png'), Path(out, 'imgs', '2011-01-04_PALSAR_20_4_zones_' + identifier + '_' + label + '.png'))
-    copy(Path(dir, '2006-10-18_ERS_20_4.png'), Path(out, 'imgs', '2006-10-18_ERS_20_4_zones_' + identifier + '_' + label + '.png'))
+    if Path(dir, 'loss_plot.png').exists():
+        copy(Path(dir, 'loss_plot.png'), Path(out, 'imgs', 'loss' + label + '.png'))
+    #copy(Path(dir, '2011-01-04_PALSAR_20_4.png'), Path(out, 'imgs', '2011-01-04_PALSAR_20_4_zones_' + identifier + '_' + label + '.png'))
+    #copy(Path(dir, '2006-10-18_ERS_20_4.png'), Path(out, 'imgs', '2006-10-18_ERS_20_4_zones_' + identifier + '_' + label + '.png'))
     #copy(Path(dir, 'loss_plot.png'), Path(out, 'loss' + denoise_filter + '.png'))
 
 scores = pd.concat(frames, keys = labels)

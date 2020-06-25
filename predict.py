@@ -96,7 +96,7 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, p
         i = i/10
         predict(model, Path(val_path, 'images'), tmp_dir, batch_size=batch_size,
                        patch_size=patch_size, preprocessor=preprocessor, cutoff=i)
-        dice_mean = evaluate_dice_only(val_path, tmp_dir)
+        dice_mean = np.mean(evaluate_dice_only(val_path, tmp_dir))
         dice.append(dice_mean)
 
     argmax = np.argmax(np.array(dice))
@@ -159,6 +159,7 @@ if __name__ is '__main__':
         out_path.mkdir(parents=True)
 
     if 'bayes' in model_name:
+        print("Bayes")
         predict_bayes(model, args.img_path, out_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
     else:
         predict(model, args.img_path, out_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)

@@ -4,6 +4,7 @@ import cv2
 from preprocessing import image_patches, preprocessor,augmentation
 import json
 import random
+from shutil import copy, rmtree
 
 
 
@@ -92,14 +93,6 @@ def generate_subset(data_dir, out_dir, set_size=None, patch_size=256, preprocess
     else:
         img_subset = files_img
 
-    if split is not None:
-        img_subset = random.shuffle(img_subset)
-        split_point = int(split * len(img_subset))
-        set1 = img_subset[:split_point]
-        set2 = img_subset[split_point:]
-        out_dir = Path(out_dir)
-        process_data(None, Path(out_dir.parent, out_dir.name + "_1"), patch_size=patch_size, preprocessor=preprocessor, img_list=set1, augment=augment)
-        process_data(None, Path(out_dir.parent, out_dir.name + "_2"), patch_size=patch_size, preprocessor=preprocessor, img_list=set2, augment=augment)
 
 
     if not patches_only:
@@ -137,6 +130,36 @@ def generate_subset(data_dir, out_dir, set_size=None, patch_size=256, preprocess
         process_data(data_dir, Path(out_dir, 'patches'), patch_size=patch_size, preprocessor=preprocessor, img_list=img_subset, augment=augment)
 
 
+def split_set(data_dir, out_dir1, out_dir2, split):
+    if not Path(out_dir1).exists():
+        Path(out_dir1, 'images').mkdir(parents=True)
+        Path(out_dir1, 'masks').mkdir(parents=True)
+        Path(out_dir1, 'lines').mkdir(parents=True)
+    if not Path(out_dir2).exists():
+        Path(out_dir2, 'images').mkdir(parents=True)
+        Path(out_dir2, 'masks').mkdir(parents=True)
+        Path(out_dir2, 'lines').mkdir(parents=True)
+
+    files_img = list(Path(data_dir, 'images').glob('*.png'))
+    random.shuffle(files_img)
+    split_point = int(split * len(files_img))
+    set1 = files_img[:split_point]
+    set2 = files_img[split_point:]
+
+    for f in set1:
+        basename = f.stem
+        copy(f, Path(out_dir1, 'images'))
+        copy(Path(data_dir, 'masks', basename + '_zones.png'), Path(out_dir1, 'masks'))
+        copy(Path(data_dir, 'lines', basename + '_front.png'), Path(out_dir1, 'lines'))
+
+    for f in set2:
+        basename = f.stem
+        copy(f, Path(out_dir2, 'images'))
+        copy(Path(data_dir, 'masks', basename + '_zones.png'), Path(out_dir2, 'masks'))
+        copy(Path(data_dir, 'lines', basename + '_front.png'), Path(out_dir2, 'lines'))
+
+
+
 
 if __name__ == "__main__":
     random.seed(42)
@@ -147,7 +170,13 @@ if __name__ == "__main__":
     out_dir = Path('/home/andreas/glacier-front-detection/data_256_attention')
     data_dir = Path('/home/andreas/glacier-front-detection/front_detection_dataset')
 
+    #generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patch_size=None)
+    split_set(Path(data_dir, 'train'), Path(out_dir, 'tmp/set1'), Path(out_dir, 'tmp/set2'), split=0.5)
+    generate_subset(Path(out_dir, 'tmp/set1'), Path(out_dir, 'train1'), patch_size=patch_size,patches_only=True)
+    generate_subset(Path(out_dir, 'tmp/set2'), Path(out_dir, 'train2'), patch_size=patch_size,patches_only=True)
 
-    generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patch_size=None)
-    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patch_size=patch_size,patches_only=True, split=0.5)
-    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patch_size=patch_size, split=0.5)
+    rmtree(Path(out_dir, 'tmp'))
+
+    split_set(Path(data_dir, 'val'), Path(out_dir, 'tmp/set1'), Path(out_dir, 'tmp/set2'), split=0.5)
+    generate_subset(Path(out_dir, 'tmp/set1'), Path(out_dir, 'val1'), patch_size=patch_size)
+    generate_subset(Path(out_dir, 'tmp/set2'), Path(out_dir, 'val2'), patch_size=patch_size)

@@ -28,7 +28,7 @@ from utils import  evaluate
 parser = argparse.ArgumentParser(description='Glacier Front Segmentation')
 
 parser.add_argument('--epochs', default=250, type=int, help='number of training epochs (integer value > 0)')
-parser.add_argument('--patience', default=10, type=int, help='how long to wait for improvements before Early_stopping')
+parser.add_argument('--patience', default=30, type=int, help='how long to wait for improvements before Early_stopping')
 parser.add_argument('--batch_size', default=-1, type=int, help='batch size (integer value), if -1 set batch size according to available gpu memery')
 parser.add_argument('--patch_size', default=256, type=int, help='size of the image patches (patch_size x patch_size')
 
@@ -63,7 +63,7 @@ args = parser.parse_args()
 START = time.time()
 
 if args.resume_training:
-    if 'hdf5' in args.resume_training:
+    if '.hdf5' in args.resume_training or '.h5' in args.resume_training:
         checkpoint_file = Path(args.resume_training)
     else:
         checkpoint_file = next(Path(args.resume_traininig).glob('*.hdf5'))
