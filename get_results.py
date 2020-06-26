@@ -10,7 +10,7 @@ from matplotlib import  pyplot as plt
 plt.rcParams.update({'font.size': 18})
 identifier = 'flip'
 path = Path('output_' + identifier)
-out = Path('/home/andreas/thesis/reports/combined_loss_flip')
+out = Path('/home/andreas/thesis/reports/bayes')
 if not out.exists():
     out.mkdir(parents=True)
 
@@ -52,10 +52,10 @@ for dir in path.iterdir():
     #copy(Path(dir, 'loss_plot.png'), Path(out, 'loss' + denoise_filter + '.png'))
 
 scores = pd.concat(frames, keys = labels)
-scores = scores.sort_index(ascending=False)
+scores = scores.sort_index(ascending=True)
 scores.to_pickle(Path(out, identifier + '_all_scores.pkl'))
+labels = sorted(labels, reverse=False)
 #%%
-labels = sorted(labels, reverse=True)
 
 def fperc(x):
     return str(round(x * 100,2))
@@ -82,6 +82,8 @@ with open(Path(out,'results_' +identifier + '.tex'), 'w') as f:
         line += " \\\\\n"
         f.write(line)
 
+#%%
+#binplot
 for column in scores.keys():
     if column == 'image':
         continue
@@ -114,7 +116,40 @@ for column in scores.keys():
     plt.savefig(str(Path(out, 'imgs', 'hist_' + identifier + '_' + column + '.png')), bbox_inches='tight', format='png', dpi=200)
     plt.show()
 
+#%%
+# Boxplot
+for column in scores.keys():
+    if column is 'image':
+        continue
 
+    score = []
+    max = scores[column].max()
+    for label in labels:
+        score.append(scores.loc[label, column])
+
+    ax = plt.figure().gca()
+    ax.yaxis.set_major_locator(plt.MaxNLocator(integer=True))
+
+    if (column == 'euclidian'):
+        plt.hist(score, bins=np.linspace(0, max, 6))
+    elif 'uncertainty' in column:
+        plt.hist(score, bins=np.linspace(0, 0.004, 6))
+    else:
+        plt.hist(score, bins=np.linspace(0.4,1,7))
+    plt.legend(labels)
+
+    if (column == 'euclidian'):
+        plt.xticks(np.linspace(0, max, 6))
+    elif 'uncertainty' in column:
+        plt.ticklabel_format(axis='x', style='sci', scilimits=(0,0))
+        plt.xticks(np.linspace(0, 0.004, 6))
+    else:
+        plt.xticks(np.arange(0.4,1, 0.1))
+    ax.set_ylabel('Score Count')
+    ax.set_xlabel('Score')
+    plt.title(column)
+    plt.savefig(str(Path(out, 'imgs', 'hist_' + identifier + '_' + column + '.png')), bbox_inches='tight', format='png', dpi=200)
+    plt.show()
 
 
 
