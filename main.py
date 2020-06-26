@@ -52,6 +52,7 @@ parser.add_argument('--out_path', type=str, help='Output path for results')
 parser.add_argument('--data_path', type=str, help='Path containing training and val data')
 parser.add_argument('--resume_training', type=str, help='Resume training from checkpoint')
 parser.add_argument('--model', default='unet_Enze19_2', type=str, help='Training Model to use')
+parser.add_argument('--drop_rate', default=0.5, type=float, help='Dropout for Bayesian Unet')
 parser.add_argument('--cyclic', default='None', type=str, help='Which cyclic learning policy to use', choices=['None', 'triangular', 'triangular2', 'exp_range' ])
 parser.add_argument('--cyclic-parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...",
                     help='dictionary with parameters for cyclic learning')
@@ -162,6 +163,9 @@ if args.resume_training:
     model = load_model(str(checkpoint_file.absolute()), custom_objects={'loss': loss_function})
 else:
     model_func = getattr(models, args.model)
+    if 'bayes' in args.model:
+        model = model_func(loss_function=loss_function, input_size=(patch_size, patch_size, 1), drop_rate=args.drop_rate)
+
     model = model_func(loss_function=loss_function, input_size=(patch_size, patch_size, 1))
 
 callbacks = []
