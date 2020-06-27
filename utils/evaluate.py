@@ -28,8 +28,11 @@ def evaluate(img_path, gt_path, prediction_path):
         gt_img = io.imread(str(Path(gt_path,gt_name)), as_gray=True)
         if (Path(prediction_path, filename.stem + '_pred.png')).exists():
             pred_img = io.imread(Path(prediction_path, filename.stem + '_pred.png'), as_gray=True)
-        else:
+        elif Path(prediction_path,filename.name).exists():
             pred_img = io.imread(Path(prediction_path,filename.name), as_gray=True) # Legacy before predictions got pred indentifier
+        else:
+            print(str(Path(prediction_path,filename.name)) + " not found")
+            continue
 
 
         gt = (gt_img > 200).astype(int)
@@ -94,8 +97,11 @@ def evaluate_dice_only(img_path, gt_path, prediction_path):
         gt_img = io.imread(Path(gt_path, filename.stem + '_zones.png'), as_gray=True)
         if (Path(prediction_path, filename.stem + '_pred.png')).exists():
             pred_img = io.imread(Path(prediction_path, filename.stem + '_pred.png'), as_gray=True)
-        else:
+        elif Path(prediction_path,filename.name).exists():
             pred_img = io.imread(Path(prediction_path,filename.name), as_gray=True) # Legacy before predictions got pred indentifier
+        else:
+            print(str(Path(prediction_path,filename.name)) + " not found")
+            continue
 
 
         gt = (gt_img > 200).astype(int)
@@ -103,6 +109,7 @@ def evaluate_dice_only(img_path, gt_path, prediction_path):
 
         gt_flat = gt.flatten()
         pred_flat = pred.flatten()
+        print(filename.name)
         dice.append(helper_functions.dice_coefficient(gt_flat, pred_flat))
     return dice
 

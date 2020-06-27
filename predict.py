@@ -99,14 +99,18 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, p
         dice_mean = np.mean(evaluate_dice_only(Path(val_path, 'images'), Path(val_path, 'masks'), tmp_dir))
         dice.append(dice_mean)
 
-    argmax = np.argmax(np.array(dice))
+    dice = np.array(dice)
+    argmax = np.argmax(dice)
+
+    np.save(Path(out_path, 'dice_cutoff.npy'), dice)
+    max_dice = dice[argmax]
     max_cutoff = (np.arange(1,10)/10)[argmax]
 
     plt.rcParams.update({'font.size': 18})
     plt.figure()
-    plt.plot((argmax/10, 0),(argmax/10, max_cutoff), linestyle=':', linewidth=2, color='grey')
+    plt.plot((max_cutoff, max_cutoff),(0, max_dice), linestyle=':', linewidth=2, color='grey')
     plt.plot(np.arange(1,10)/10, dice)
-    plt.annotate(str(np.array(dice)[argmax]), (max_cutoff, np.array(dice)[argmax] + 0.05), fontsize='x-small')
+    plt.annotate(f'{max_dice:.2f}', (max_cutoff, max_dice), fontsize='x-small')
     plt.ylabel('Dice')
     plt.xlabel('Cutoff Point')
     plt.savefig(str(Path(out_path, 'cutoff.png')), bbox_inches='tight', format='png', dpi=200)
