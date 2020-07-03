@@ -38,16 +38,21 @@ def predict(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5
         mask_predicted = reconstruct_from_grayscale_patches(p_img_predicted,i_img)[0]
         mask_predicted = mask_predicted[:img.shape[0], :img.shape[1]]
 
+        if cutoff is not None:
+            # thresholding to make binary mask
+            mask_predicted[mask_predicted < cutoff] = 0
+            mask_predicted[mask_predicted >= cutoff] = 255
+        else:
+            mask_predicted = 255 * mask_predicted
 
-        # thresholding to make binary mask
-        mask_predicted[mask_predicted < cutoff] = 0
-        mask_predicted[mask_predicted >= cutoff] = 255
 
         io.imsave(Path(out_path, filename.stem + '_pred.png'), mask_predicted.astype(np.uint8))
 
-def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 50):
+def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 20):
     if not Path(out_path).exists():
         Path(out_path).mkdir(parents=True)
+
+    predict_options = {'mc_iterations': mc_iterations}
 
     for filename in Path(img_path).rglob('*.png'):
         #print(filename)
@@ -71,12 +76,15 @@ def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cuto
         mask_predicted = reconstruct_from_grayscale_patches(p_img_predicted,i_img)[0]
         mask_predicted = mask_predicted[:img.shape[0], :img.shape[1]]
 
-        mask_predicted_img = (65535 * mask_predicted).astype(np.uint16)
-        cv2.imwrite(str(Path(out_path, filename.stem + '_pred_perc.png')), mask_predicted_img)
+        mask_predicted_img = 65535 * mask_predicted
+        io.imsave(Path(out_path, filename.stem + '_pred_perc.png'), mask_predicted_img.astype(np.uint16))
 
-        # thresholding to make binary mask
-        mask_predicted[mask_predicted < cutoff] = 0
-        mask_predicted[mask_predicted >= cutoff] = 255
+        if cutoff is not None:
+            # thresholding to make binary mask
+            mask_predicted[mask_predicted < cutoff] = 0
+            mask_predicted[mask_predicted >= cutoff] = 255
+        else:
+            mask_predicted = 255 * mask_predicted
 
         io.imsave(Path(out_path, filename.stem + '_pred.png'), mask_predicted.astype(np.uint8))
 
@@ -91,18 +99,41 @@ def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cuto
 
 def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, preprocessor=None):
     tmp_dir = Path(out_path, 'cutoff_tmp')
+
+    if 'bayes' in model.name:
+        predict_bayes(model, Path(val_path, 'images'), tmp_dir, batch_size=batch_size,
+                patch_size=patch_size, preprocessor=preprocessor, cutoff=None)
+    else:
+        predict(model, Path(val_path, 'images'), tmp_dir, batch_size=batch_size,
+                patch_size=patch_size, preprocessor=preprocessor, cutoff=None)
+
+    # Read images into memory
+    imgs = []
+    gt_imgs = []
+    pred_imgs = []
+    for filename in Path(val_path, 'images').glob('*.png'):
+        imgs.append(io.imread(filename, as_gray=True))
+
+        gt_imgs.append(io.imread(Path(val_path, 'masks', filename.stem + '_zones.png'), as_gray=True))
+        if (Path(tmp_dir, filename.stem + '_pred.png')).exists():
+            pred_img = io.imread(Path(tmp_dir, filename.stem + '_pred.png'), as_gray=True)
+        elif Path(tmp_dir,filename.name).exists():
+            pred_img = io.imread(Path(tmp_dir,filename.name), as_gray=True) # Legacy before predictions got pred indentifier
+        pred_img = pred_img / 255
+        pred_imgs.append(pred_img)
+
+    # Try different cutoff points
     dice = []
     for i in range(1,10):
-        i = i/10
-        predict(model, Path(val_path, 'images'), tmp_dir, batch_size=batch_size,
-                       patch_size=patch_size, preprocessor=preprocessor, cutoff=i)
-        dice_mean = np.mean(evaluate_dice_only(Path(val_path, 'images'), Path(val_path, 'masks'), tmp_dir))
+        cutoff = i/10
+        pred_bin = [pred >= cutoff for pred in pred_imgs]
+        dice_mean = np.mean(evaluate_dice_only(imgs, gt_imgs, pred_bin))
         dice.append(dice_mean)
 
     dice = np.array(dice)
     argmax = np.argmax(dice)
 
-    np.save(Path(out_path, 'dice_cutoff.npy'), dice)
+    np.save(Path(out_path, 'dice_cutoff.npy'), dice)  # Save all values for later plot changes
     max_dice = dice[argmax]
     max_cutoff = (np.arange(1,10)/10)[argmax]
 
@@ -115,9 +146,11 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, p
     plt.xlabel('Cutoff Point')
     plt.savefig(str(Path(out_path, 'cutoff.png')), bbox_inches='tight', format='png', dpi=200)
 
-    shutil.rmtree(tmp_dir, ignore_errors=True)
+    #shutil.rmtree(tmp_dir, ignore_errors=True)
 
     return max_cutoff
+
+
 
 if __name__ is '__main__':
     parser = argparse.ArgumentParser(description='Glacier Front Segmentation Prediction')

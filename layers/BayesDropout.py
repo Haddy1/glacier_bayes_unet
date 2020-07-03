@@ -14,11 +14,14 @@ class BayesDropout(Dropout):
 
   def call(self, inputs, training=None):
 
-    return nn.dropout(
-          inputs,
-          noise_shape=self._get_noise_shape(inputs),
-          seed=self.seed,
-          rate=self.rate)
+    if 0. < self.rate < 1.:
+        return nn.dropout(
+              inputs,
+              noise_shape=self._get_noise_shape(inputs),
+              seed=self.seed,
+              rate=self.rate)
+    else:
+        return inputs
 
 
 

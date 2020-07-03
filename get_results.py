@@ -119,7 +119,9 @@ for column in scores.keys():
 #%%
 # Boxplot
 for column in scores.keys():
-    if column is 'image':
+    if column == 'image':
+        continue
+    if column == 'euclidian':
         continue
 
     score = []
@@ -130,12 +132,11 @@ for column in scores.keys():
     ax = plt.figure().gca()
     ax.yaxis.set_major_locator(plt.MaxNLocator(integer=True))
 
-    if (column == 'euclidian'):
-        plt.hist(score, bins=np.linspace(0, max, 6))
-    elif 'uncertainty' in column:
-        plt.hist(score, bins=np.linspace(0, 0.004, 6))
+    if 'uncertainty' in column:
+        continue
+        plt.box(score)
     else:
-        plt.hist(score, bins=np.linspace(0.4,1,7))
+        plt.box(score, bins=np.linspace(0.4,1,7))
     plt.legend(labels)
 
     if (column == 'euclidian'):

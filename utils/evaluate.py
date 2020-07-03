@@ -67,7 +67,7 @@ def evaluate(img_path, gt_path, prediction_path):
             io.imsave(Path(prediction_path, filename.stem + '_diff.png'), diff)
 
 
-    scores = pd.DataFrame(scores)
+    scores = pd.DataFrame.from_dict(scores)
     print(prediction_path)
     print('Dice\tIOU\tEucl\tSensitivity\tSpecificitiy')
     print(
@@ -90,8 +90,17 @@ def evaluate(img_path, gt_path, prediction_path):
     scores.to_pickle(Path(prediction_path, 'scores.pkl'))
     return scores
 
+def evaluate_dice_only(imgs, gt_imgs, predictions):
+    dice = []
+    for img, gt_img, pred in zip(imgs, gt_imgs, predictions):
+        gt = (gt_img > 200).astype(int)
+        gt_flat = gt.flatten()
+        pred_flat = pred.flatten()
+        dice.append(helper_functions.dice_coefficient(gt_flat, pred_flat))
+    return dice
 
-def evaluate_dice_only(img_path, gt_path, prediction_path):
+
+def evaluate_dice_only_(img_path, gt_path, prediction_path):
     dice = []
     for filename in Path(img_path).rglob('*.png'):
         gt_img = io.imread(Path(gt_path, filename.stem + '_zones.png'), as_gray=True)
@@ -139,11 +148,11 @@ def eval_uncertainty(file, out_file, vmin=0, vmax=0.2):
     plt.savefig(out_file, bbox_inches='tight', format='png', dpi=200)
 
 if __name__ is '__main__':
-    path = Path('/home/andreas/glacier-front-detection/output_attention')
+    path = Path('/home/andreas/glacier-front-detection/output_bayes/bayes')
     test_path = Path('/home/andreas/glacier-front-detection/front_detection_dataset/test')
     #history = pickle.load(open(next(path.glob('history*.pkl')), 'rb'))
-    history = pd.read_csv(Path(path,'model_1_history.csv'))
-    plot_history(history, Path(path, 'loss_plot.png') , xlim=(-10,30), ylim=(0,0.75), title='Set1')
+    #history = pd.read_csv(Path(path,'model_1_history.csv'))
+    #plot_history(history, Path(path, 'loss_plot.png') , xlim=(-10,30), ylim=(0,0.75), title='Set1')
 
     evaluate(Path(test_path, 'images'), Path(test_path, 'masks'), path)
     #for d in Path('/home/andreas/glacier-front-detection/output_bayes').iterdir():

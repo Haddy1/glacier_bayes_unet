@@ -215,8 +215,7 @@ def unet_Enze19_2(pretrained_weights = None,input_size = (256,256,1), loss_funct
 
     conv10 = Conv2D(1, 3, padding = 'same', activation = 'sigmoid')(conv9)
 
-    model = Model(inputs = inputs, outputs = conv10)
-    #model.name = 'unet_Enze19_2'
+    model = Model(inputs = inputs, outputs = conv10, name='unet_Enze19_2')
 
     model.compile(optimizer = Adam(lr = 1e-4), loss = loss_function, metrics = ['accuracy'])
 
@@ -324,8 +323,7 @@ def unet_Enze19_2_bayes(pretrained_weights = None,input_size = (256,256,1), loss
 
     conv10 = Conv2D(1, 3, padding = 'same', activation = 'sigmoid')(conv9)
 
-    model = Model(inputs = inputs, outputs = conv10)
-    #model.name = 'unet_Enze19_bayes'
+    model = Model(inputs = inputs, outputs = conv10, name='unet_Enze19_bayes')
 
     model.compile(optimizer = Adam(lr = 1e-4), loss = loss_function, metrics = ['accuracy'])
 
