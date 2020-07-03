@@ -45,9 +45,13 @@ for arg, value in args.__dict__.items():
     parms += "--" + arg + " " + str(value) + " "
 
 
-print(subprocess.call("python3 main.py " + parms + " --evaluate 0 --out_path " + str(prediction_path), shell=True))
+subprocess.call("python3 main.py " + parms + " --evaluate 0 --out_path " + str(prediction_path), shell=True)
+
+
 
 out_path = Path(args.out_path)
+model_file = next(prediction_path.glob('model_*.h5'))
+copy(model_file, out_path)
 
 if not Path(out_path, 'train', 'images').exists():
     Path(out_path, 'train', 'images').mkdir(parents=True)
