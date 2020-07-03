@@ -6,10 +6,10 @@ from keras.models import load_model
 import pickle
 import argparse
 from loss_functions import *
+from keras.losses import binary_crossentropy
 from layers.BayesDropout import  BayesDropout
 from preprocessing.preprocessor import Preprocessor
 from preprocessing import filter
-from keras.losses import binary_crossentropy
 import numpy as np
 import skimage.io as io
 import cv2

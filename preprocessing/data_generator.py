@@ -9,6 +9,7 @@ from shutil import copy, rmtree
 
 
 def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=None, augment = None):
+
     if not Path(out_dir).exists():
         Path(out_dir).mkdir(parents=True)
 
@@ -16,8 +17,6 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
         Path(out_dir, 'images').mkdir()
     if not Path(out_dir, 'masks').exists():
         Path(out_dir, 'masks').mkdir()
-    if not Path(out_dir, 'lines').exists():
-        Path(out_dir, 'lines').mkdir()
 
     if img_list:
         files_img = img_list
@@ -29,13 +28,15 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
     for f in files_img:
         basename = f.stem
         img = cv2.imread(str(f), cv2.IMREAD_GRAYSCALE)
+        shape = img.shape
         if preprocessor is not None:
             img = preprocessor.process(img)
-        mask_front = cv2.imread(str(Path(in_dir, 'lines', basename + '_front.png')), cv2.IMREAD_GRAYSCALE)
-        mask_zones = cv2.imread(str(Path(in_dir, 'masks', basename + '_zones.png')), cv2.IMREAD_GRAYSCALE)
+
         img = cv2.copyMakeBorder(img, 0, (patch_size - img.shape[0]) % patch_size, 0, (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
-        mask_front = cv2.copyMakeBorder(mask_front, 0, (patch_size - mask_front.shape[0]) % patch_size, 0, (patch_size - mask_front.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
+
+        mask_zones = cv2.imread(str(Path(in_dir, 'masks', basename + '_zones.png')), cv2.IMREAD_GRAYSCALE)
         mask_zones = cv2.copyMakeBorder(mask_zones, 0, (patch_size - mask_zones.shape[0]) % patch_size, 0, (patch_size - mask_zones.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
+
 
 
 
@@ -45,27 +46,23 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
         if augment is not None:
             imgs, augs = augment(img)
             masks_zones, _ = augment(mask_zones)
-            masks_front, _ = augment(mask_front)
         else:
             imgs = [img]
             masks_zones = [mask_zones]
-            masks_front = [mask_front]
             augs = ['']
 
-        for img, mask_zones, mask_front,augmentation  in zip(imgs, masks_zones, masks_front, augs):
+
+        for img, mask_zones,augmentation  in zip(imgs, masks_zones, augs):
 
             p_mask_zones, i_mask_zones = image_patches.extract_grayscale_patches(mask_zones, (patch_size, patch_size), stride = (patch_size, patch_size))
             p_img, i_img = image_patches.extract_grayscale_patches(img, (patch_size, patch_size), stride = (patch_size, patch_size))
-            p_mask_front, i_mask_front = image_patches.extract_grayscale_patches(mask_front, (patch_size, patch_size), stride = (patch_size, patch_size))
-
 
             patch_indices = []
             for j in range(p_mask_zones.shape[0]):
-                # if np.count_nonzero(p_masks_zone[j])/(patch_size*patch_size) > 0.05 and np.count_nonzero(p_masks_zone[j])/(patch_size*patch_size) < 0.95: # only those patches that has both background and foreground
                 if np.count_nonzero(p_mask_zones[j])/(patch_size*patch_size) >= 0 and np.count_nonzero(p_mask_zones[j])/(patch_size*patch_size) <= 1:
                     cv2.imwrite(str(Path(out_dir, 'images/'+str(patch_counter)+'.png')), p_img[j])
                     cv2.imwrite(str(Path(out_dir, 'masks/'+str(patch_counter)+'.png')), p_mask_zones[j])
-                    cv2.imwrite(str(Path(out_dir, 'lines/'+str(patch_counter)+'.png')), p_mask_front[j])
+
                     patch_indices.append(patch_counter) # store patch nrs used for image
                     patch_counter += 1
 
@@ -73,7 +70,8 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
             patch_meta_data = {}
             patch_meta_data['origin'] = [i_mask_zones[0].tolist(), i_mask_zones[1].tolist()]
             patch_meta_data['indices'] = patch_indices
-            patch_meta_data['img_shape'] = list(img.shape)
+            # Todo: Fix img shape for augmentations
+            patch_meta_data['img_shape'] = list(shape)
 
             img_patch_index[basename+augmentation] = patch_meta_data
 
@@ -98,8 +96,6 @@ def generate_subset(data_dir, out_dir, set_size=None, patch_size=256, preprocess
     if not patches_only:
         if not Path(out_dir, 'images').exists():
             Path(out_dir, 'images').mkdir(parents=True)
-        if not Path(out_dir, 'lines').exists():
-            Path(out_dir, 'lines').mkdir()
         if not Path(out_dir, 'masks').exists():
             Path(out_dir, 'masks').mkdir()
 
@@ -109,22 +105,18 @@ def generate_subset(data_dir, out_dir, set_size=None, patch_size=256, preprocess
             img = cv2.imread(str(f), cv2.IMREAD_GRAYSCALE)
             if preprocessor is not None:
                 img = preprocessor.process(img)
-            mask_front = cv2.imread(str(Path(data_dir, 'lines', basename + '_front.png')), cv2.IMREAD_GRAYSCALE)
             mask_zones = cv2.imread(str(Path(data_dir, 'masks', basename + '_zones.png')), cv2.IMREAD_GRAYSCALE)
             if augment is not None:
                 imgs, augs = augment(img)
                 masks_zones, _ = augment(mask_zones)
-                masks_front, _ = augment(mask_front)
             else:
                 imgs = [img]
                 masks_zones= [mask_zones]
-                masks_front = [mask_front]
                 augs = ['']
 
-            for img, mask_zones, mask_front,augmentation  in zip(imgs, masks_zones, masks_front, augs):
+            for img, mask_zones ,augmentation  in zip(imgs, masks_zones, augs):
                 cv2.imwrite(str(Path(out_dir, 'images', basename + augmentation + '.png')), img)
                 cv2.imwrite(str(Path(out_dir, 'masks', basename + augmentation + '_zones.png')), mask_zones)
-                cv2.imwrite(str(Path(out_dir, 'lines', basename + augmentation + '_front.png')), mask_front)
 
     if patch_size is not None:
         process_data(data_dir, Path(out_dir, 'patches'), patch_size=patch_size, preprocessor=preprocessor, img_list=img_subset, augment=augment)
@@ -134,11 +126,9 @@ def split_set(data_dir, out_dir1, out_dir2, split):
     if not Path(out_dir1).exists():
         Path(out_dir1, 'images').mkdir(parents=True)
         Path(out_dir1, 'masks').mkdir(parents=True)
-        Path(out_dir1, 'lines').mkdir(parents=True)
     if not Path(out_dir2).exists():
         Path(out_dir2, 'images').mkdir(parents=True)
         Path(out_dir2, 'masks').mkdir(parents=True)
-        Path(out_dir2, 'lines').mkdir(parents=True)
 
     files_img = list(Path(data_dir, 'images').glob('*.png'))
     random.shuffle(files_img)
@@ -150,13 +140,11 @@ def split_set(data_dir, out_dir1, out_dir2, split):
         basename = f.stem
         copy(f, Path(out_dir1, 'images'))
         copy(Path(data_dir, 'masks', basename + '_zones.png'), Path(out_dir1, 'masks'))
-        copy(Path(data_dir, 'lines', basename + '_front.png'), Path(out_dir1, 'lines'))
 
     for f in set2:
         basename = f.stem
         copy(f, Path(out_dir2, 'images'))
         copy(Path(data_dir, 'masks', basename + '_zones.png'), Path(out_dir2, 'masks'))
-        copy(Path(data_dir, 'lines', basename + '_front.png'), Path(out_dir2, 'lines'))
 
 
 

@@ -58,6 +58,7 @@ if __name__ == '__main__':
     parser.add_argument('--cyclic-parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...",
                         help='dictionary with parameters for cyclic learning')
     parser.add_argument('--learning_rate', type=float, default=1e-4, help='Initial learning rate')
+    parser.add_argument('--predict', type=int, default=1, help='Evaluate prediction')
     parser.add_argument('--evaluate', type=int, default=1, help='Evaluate prediction')
     # parser.add_argument('--Random_Seed', default=1, type=int, help='random seed number value (any integer value)')
 
@@ -87,19 +88,6 @@ if __name__ == '__main__':
     else:
         out_path = Path('data_' + str(patch_size) + '/test/masks_predicted_' + time.strftime("%y%m%d-%H%M%S"))
 
-    if args.image_patches:
-        if Path(data_path, 'train/patches').exists():
-            patches_path_train = Path(data_path, 'train/patches')
-        else:
-            patches_path_train = Path(data_path,'train')
-
-        if Path(data_path, 'val/patches').exists():
-            patches_path_val = Path(data_path, 'val/patches')
-        else:
-            patches_path_val = Path(data_path,'val')
-    else:
-        patches_path_train = Path(out_path, 'train/patches')
-        patches_path_val = Path(out_path, 'val/patches')
 
     if not out_path.exists():
         out_path.mkdir(parents=True)
@@ -117,12 +105,14 @@ if __name__ == '__main__':
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(25, 25))  # CLAHE adaptive contrast enhancement
         preprocessor.add_filter(clahe.apply)
 
-    if not args.image_patches:
-        if not patches_path_train.exists():
-            data_generator.process_data(Path(data_path, 'train'), Path(patches_path_train), patch_size=patch_size,
+    patches_path_train = Path(data_path, 'train/patches')
+    if not patches_path_train.exists() or not Path(patches_path_train, 'image_list.json').exists():
+        data_generator.process_data(Path(data_path, 'train'), Path(patches_path_train), patch_size=patch_size,
                                         preprocessor=preprocessor)
-        if not patches_path_val.exists():
-            data_generator.process_data(Path(data_path, 'val'), Path(patches_path_val), patch_size=patch_size,
+
+    patches_path_val = Path(data_path, 'val/patches')
+    if not patches_path_val.exists() or not Path(patches_path_val, 'image_list.json').exists():
+        data_generator.process_data(Path(data_path, 'val'), Path(patches_path_val), patch_size=patch_size,
                                         preprocessor=preprocessor)
 
     # copy image file list to output
@@ -131,11 +121,13 @@ if __name__ == '__main__':
     if Path(patches_path_val, 'image_list.json').exists():
         copy(Path(patches_path_val, 'image_list.json'), Path(out_path, 'val_image_list.json'))
 
+    print(patches_path_train)
+
     train_Generator = trainGenerator(batch_size=batch_size,
                                      train_path=str(patches_path_train),
                                      image_folder='images',
                                      mask_folder='masks',
-                                     aug_dict=args.image_aug,
+                                     aug_dict=None,
                                      save_to_dir=None)
 
     val_Generator = trainGenerator(batch_size=batch_size,
@@ -168,8 +160,12 @@ if __name__ == '__main__':
 
     callbacks.append(model_checkpoint)
 
+    print(patches_path_train)
     num_samples = len([file for file in Path(patches_path_train, 'images').rglob('*.png')])  # number of training samples
     num_val_samples = len([file for file in Path(patches_path_val, 'images').rglob('*.png')])  # number of val samples
+
+    print(num_samples)
+    print(num_val_samples)
 
 
     if args.early_stopping:
@@ -243,13 +239,14 @@ if __name__ == '__main__':
             args.__dict__['cutoff'] = cutoff
             f.write(json.dumps(vars(args)))
 
-    test_path = str(Path(data_path, 'test'))
-    if 'bayes' in model.name:
-        predict_bayes(model, Path(test_path, 'images'), out_path, batch_size=batch_size, patch_size=patch_size, preprocessor=preprocessor, cutoff=cutoff)
-    else:
-        predict(model, Path(test_path, 'images'), out_path, batch_size=batch_size, patch_size=patch_size, preprocessor=preprocessor, cutoff=cutoff)
-    if args.evaluate:
-        evaluate.evaluate(Path(test_path, 'images'), Path(test_path, 'masks'), out_path)
+    if args.predict:
+        test_path = str(Path(data_path, 'test'))
+        if 'bayes' in model.name:
+            predict_bayes(model, Path(test_path, 'images'), out_path, batch_size=batch_size, patch_size=patch_size, preprocessor=preprocessor, cutoff=cutoff)
+        else:
+            predict(model, Path(test_path, 'images'), out_path, batch_size=batch_size, patch_size=patch_size, preprocessor=preprocessor, cutoff=cutoff)
+        if args.evaluate:
+            evaluate.evaluate(Path(test_path, 'images'), Path(test_path, 'masks'), out_path)
 
     END = time.time()
     print('Execution Time: ', END - START)
