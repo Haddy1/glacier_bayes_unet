@@ -50,21 +50,21 @@ def evaluate(img_path, gt_path, prediction_path):
         scores['sensitivity'].append(recall_score(gt_flat, pred_flat))
 
         if Path(prediction_path, filename.stem + '_uncertainty.png').exists():
-            if not 'uncertainty_mean' in scores:
-                scores['uncertainty_mean'] = []
-                scores['uncertainty_var'] = []
+            if not 'uncertainty' in scores:
+                scores['uncertainty'] = []
 
             uncertainty_img = io.imread(Path(prediction_path, filename.stem + '_uncertainty.png'), as_gray=True)
             uncertainty = uncertainty_img / 65535
-            scores['uncertainty_mean'].append(uncertainty.mean())
-            scores['uncertainty_var'].append(uncertainty.var())
+            scores['uncertainty'].append(uncertainty.mean())
             plt.figure()
             sns.heatmap(uncertainty, vmin=0, vmax=0.15, xticklabels=False, yticklabels=False)
             plt.savefig(Path(prediction_path, filename.stem + '_heatmap.png'), bbox_inches='tight', format='png', dpi=300)
             plt.close()
 
-            diff = 255 * (gt != pred).astype(np.uint8)
-            io.imsave(Path(prediction_path, filename.stem + '_diff.png'), diff)
+
+
+        diff = 255 * (gt != pred).astype(np.uint8)
+        io.imsave(Path(prediction_path, filename.stem + '_diff.png'), diff)
 
 
     scores = pd.DataFrame.from_dict(scores)
@@ -148,7 +148,7 @@ def eval_uncertainty(file, out_file, vmin=0, vmax=0.2):
     plt.savefig(out_file, bbox_inches='tight', format='png', dpi=200)
 
 if __name__ is '__main__':
-    path = Path('/home/andreas/glacier-front-detection/output_bayes/bayes')
+    path = Path('/home/andreas/glacier-front-detection/output_bayes/no_bayes')
     test_path = Path('/home/andreas/glacier-front-detection/front_detection_dataset/test')
     #history = pickle.load(open(next(path.glob('history*.pkl')), 'rb'))
     #history = pd.read_csv(Path(path,'model_1_history.csv'))

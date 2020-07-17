@@ -48,7 +48,7 @@ def predict(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5
 
         io.imsave(Path(out_path, filename.stem + '_pred.png'), mask_predicted.astype(np.uint8))
 
-def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 20):
+def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 20, uncertainty_threshold=1e-3):
     if not Path(out_path).exists():
         Path(out_path).mkdir(parents=True)
 
@@ -93,7 +93,12 @@ def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cuto
         uncertainty = reconstruct_from_grayscale_patches(p_uncertainty,i_img)[0]
         uncertainty = uncertainty[:img.shape[0], :img.shape[1]]
         uncertainty_img = (65535 * uncertainty).astype(np.uint16)
-        cv2.imwrite(str(Path(out_path, filename.stem + '_uncertainty.png')), uncertainty_img)
+        io.imsave(Path(out_path, filename.stem + '_uncertainty.png'), uncertainty_img)
+
+        confidence_img = mask_predicted[:,:,None] * np.ones((img.shape[0], img.shape[1], 3)) # broadcast to rgb img
+        confidence_img = confidence_img.astype(np.uint8)
+        confidence_img[uncertainty > uncertainty_threshold, :] = np.array([255, 0,0])   # make  uncertain pixels red
+        io.imsave(Path(out_path, filename.stem + '_confidence.png'), confidence_img)
         #np.save(Path(out_path, filename.stem + '_uncertainty.npy'), uncertainty)
 
 
@@ -152,12 +157,12 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, p
 
 
 
-if __name__ is '__main__':
+if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Glacier Front Segmentation Prediction')
     parser.add_argument('--model_path', type=str, help='Path containing trained model')
     parser.add_argument('--img_path', type=str, help='Path containing images to be segmented')
     parser.add_argument('--out_path', type=str, help='output path for predictions')
-    parser.add_argument('--gt_path', type=str, help='Path containing the ground truth, necessary for evaluation')
+    parser.add_argument('--gt_path', type=str, help='Path containing the ground truth, necessary for evaluation_scripts')
     parser.add_argument('--batch_size', default=1, type=int, help='batch size (integer value)')
     parser.add_argument('--cutoff', type=float, help='cutoff point of binarisation')
     args = parser.parse_args()

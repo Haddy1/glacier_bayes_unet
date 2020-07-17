@@ -6,9 +6,11 @@ from shutil import copy
 import pandas as pd
 import numpy as np
 from matplotlib import  pyplot as plt
-
+import seaborn as sns
+import os
+os.chdir('../')
 plt.rcParams.update({'font.size': 18})
-identifier = 'flip'
+identifier = 'bayes'
 path = Path('output_' + identifier)
 out = Path('/home/andreas/thesis/reports/bayes')
 if not out.exists():
@@ -25,7 +27,7 @@ for dir in path.iterdir():
 
     if Path(dir, 'options.json').exists():
         arguments = json.load(open(Path(dir, 'options.json'), 'r'))
-    if identifier == 'combined':
+    if identifier == 'combined' or identifier == 'flip':
         loss_split = arguments['loss_parms']
         label= str(loss_split['binary_crossentropy']) + '_' + str(loss_split['focal_loss'])
     elif identifier == 'filter':
@@ -47,12 +49,13 @@ for dir in path.iterdir():
         Path(out, 'imgs').mkdir()
     if Path(dir, 'loss_plot.png').exists():
         copy(Path(dir, 'loss_plot.png'), Path(out, 'imgs', 'loss' + label + '.png'))
-    #copy(Path(dir, '2011-01-04_PALSAR_20_4.png'), Path(out, 'imgs', '2011-01-04_PALSAR_20_4_zones_' + identifier + '_' + label + '.png'))
-    #copy(Path(dir, '2006-10-18_ERS_20_4.png'), Path(out, 'imgs', '2006-10-18_ERS_20_4_zones_' + identifier + '_' + label + '.png'))
+    #copy(Path(dir, '2011-01-04_PALSAR_20_4_pred.png'), Path(out, 'imgs', '2011-01-04_PALSAR_20_4_pred_' + identifier + '_' + label + '.png'))
+    #copy(Path(dir, '2006-10-18_ERS_20_4_pred.png'), Path(out, 'imgs', '2006-10-18_ERS_20_4_pred_' + identifier + '_' + label + '.png'))
     #copy(Path(dir, 'loss_plot.png'), Path(out, 'loss' + denoise_filter + '.png'))
 
 scores = pd.concat(frames, keys = labels)
 scores = scores.sort_index(ascending=True)
+
 scores.to_pickle(Path(out, identifier + '_all_scores.pkl'))
 labels = sorted(labels, reverse=False)
 #%%
@@ -61,17 +64,19 @@ def fperc(x):
     return str(round(x * 100,2))
 
 
-with open(Path(out,'results_' +identifier + '.tex'), 'w') as f:
+with open(Path(out,'results_' +identifier + '_horizontal.tex'), 'w') as f:
     for column in scores.columns:
         if column == 'image':
             continue
         if column == 'euclidian':
-            f.write(' & ' + column + ' (\pm SD)')
+            f.write(' & ' + column.capitalize() + ' (\pm SD)')
+        elif column == 'IOU':
+            f.write(' & ' + 'IOU' + ' (\pm SD)')
         else:
-            f.write(' & ' + column + '\% (\pm SD)')
+            f.write(' & ' + column.capitalize() + '\% (\pm SD)')
     f.write(' \\\\\n')
     for label , results in scores.groupby(level=0, sort=False):
-        line = label
+        line = label.capitalize()
         for column in results.columns:
             if column == 'image':
                 continue
@@ -79,6 +84,25 @@ with open(Path(out,'results_' +identifier + '.tex'), 'w') as f:
                 line += ' & ' + str(round(results[column].mean(),2)) + ' (\\pm ' + str(round(results[column].std(), 2)) + ')'
             else:
                 line += ' & ' + fperc(results[column].mean()) + ' (\\pm ' + fperc(results[column].std()) + ')'
+        line += " \\\\\n"
+        f.write(line)
+
+with open(Path(out,'results_' +identifier + '_vertical.tex'), 'w') as f:
+    for label in scores.index.levels[0]:
+        f.write(' & ' + label.capitalize())
+    f.write(' \\\\\n')
+    for column in scores:
+        if column == 'image':
+            continue
+        if column == 'IOU':
+            line = 'IOU';
+        else:
+            line = column.capitalize()
+        for label , results in scores[column].groupby(level=0, sort=False):
+            if column == 'euclidian':
+                line += ' & ' + str(round(results.mean(),2)) + ' (\\pm ' + str(round(results.std(), 2)) + ')'
+            else:
+                line += ' & ' + fperc(results.mean()) + ' (\\pm ' + fperc(results.std()) + ')'
         line += " \\\\\n"
         f.write(line)
 
@@ -118,6 +142,14 @@ for column in scores.keys():
 
 #%%
 # Boxplot
+scores.index.names = ['Split', 'index']
+scores = scores.reset_index()
+ax = sns.boxplot(x='Split', y='dice', data=scores, orient='v')
+plt.xticks(
+    rotation=45,
+    horizontalalignment='right')
+plt.ylabel('Dice Coefficient')
+plt.show()
 for column in scores.keys():
     if column == 'image':
         continue
@@ -134,10 +166,9 @@ for column in scores.keys():
 
     if 'uncertainty' in column:
         continue
-        plt.box(score)
     else:
-        plt.box(score, bins=np.linspace(0.4,1,7))
-    plt.legend(labels)
+        sns.boxplot(data=score, orient='v')
+    #plt.legend(labels)
 
     if (column == 'euclidian'):
         plt.xticks(np.linspace(0, max, 6))
