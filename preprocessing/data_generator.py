@@ -1,7 +1,9 @@
 from pathlib import Path
 import numpy as np
 import cv2
+from skimage import io
 from preprocessing import image_patches, preprocessor,augmentation
+#import image_patches, preprocessor,augmentation
 import json
 import random
 from shutil import copy, rmtree
@@ -147,6 +149,21 @@ def split_set(data_dir, out_dir1, out_dir2, split):
         copy(Path(data_dir, 'masks', basename + '_zones.png'), Path(out_dir2, 'masks'))
 
 
+def bayes_train_gen(img_path, pred_path, out_path, uncertainty_threshold = 1e-3):
+
+    if not Path(out_path).exists():
+        Path(out_path).mkdir(parents=True)
+    if not Path(out_path, 'images').exists():
+        Path(out_path, 'images').mkdir(parents=True)
+    if not Path(out_path, 'masks').exists():
+        Path(out_path, 'masks').mkdir(parents=True)
+
+    for f in Path(img_path).rglob('*.png'):
+        basename = f.stem
+        uncertainty = io.imloadPath(pred_path, basename + '_uncertainty.png') / 65535
+        if np.mean(uncertainty) < uncertainty_threshold:
+            copy(f, Path(out_path, 'images'))
+            copy(Path(pred_path, basename + '_pred.png'), Path(out_path, 'images'))
 
 
 if __name__ == "__main__":
@@ -155,16 +172,18 @@ if __name__ == "__main__":
 
     preprocessor = preprocessor.Preprocessor()
 
-    out_dir = Path('/home/andreas/glacier-front-detection/data_256_attention')
-    data_dir = Path('/home/andreas/glacier-front-detection/front_detection_dataset')
+    out_dir = Path('/home/oc39otib/glacier-front-detection/data_split')
+    data_dir = Path('/home/oc39otib/glacier-front-detection/front_detection_dataset')
+    split_set(Path(data_dir, 'train'), Path(out_dir, 'train'), Path(out_dir, 'unlabeled'), split=0.5)
+    #generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patch_size=None)
 
     #generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patch_size=None)
-    split_set(Path(data_dir, 'train'), Path(out_dir, 'tmp/set1'), Path(out_dir, 'tmp/set2'), split=0.5)
-    generate_subset(Path(out_dir, 'tmp/set1'), Path(out_dir, 'train1'), patch_size=patch_size,patches_only=True)
-    generate_subset(Path(out_dir, 'tmp/set2'), Path(out_dir, 'train2'), patch_size=patch_size,patches_only=True)
+    #split_set(Path(data_dir), Path(out_dir, 'unlabeled'), Path(out_dir, 'tmp'), split=0.6)
+    #generate_subset(Path(out_dir, 'tmp/set1'), Path(out_dir, 'train1'), patch_size=patch_size,patches_only=True)
+    #generate_subset(Path(out_dir, 'tmp/set2'), Path(out_dir, 'train2'), patch_size=patch_size,patches_only=True)
 
-    rmtree(Path(out_dir, 'tmp'))
+    #rmtree(Path(out_dir, 'tmp'))
 
-    split_set(Path(data_dir, 'val'), Path(out_dir, 'tmp/set1'), Path(out_dir, 'tmp/set2'), split=0.5)
-    generate_subset(Path(out_dir, 'tmp/set1'), Path(out_dir, 'val1'), patch_size=patch_size)
-    generate_subset(Path(out_dir, 'tmp/set2'), Path(out_dir, 'val2'), patch_size=patch_size)
+    #split_set(Path(out_dir, 'tmp2'), Path(out_dir, 'tmp_val'), Path(out_dir, 'test'), split=0.5)
+    #generate_subset(Path(out_dir, 'tmp_val'), Path(out_dir, 'val'), patch_size=patch_size)
+    #generate_subset(Path(out_dir, 'tmp/set2'), Path(out_dir, 'val2'), patch_size=patch_size)

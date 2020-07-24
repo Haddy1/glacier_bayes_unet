@@ -48,7 +48,7 @@ def predict(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5
 
         io.imsave(Path(out_path, filename.stem + '_pred.png'), mask_predicted.astype(np.uint8))
 
-def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 20):
+def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 20, uncertainty_threshold=1e-3):
     if not Path(out_path).exists():
         Path(out_path).mkdir(parents=True)
 
@@ -93,7 +93,12 @@ def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cuto
         uncertainty = reconstruct_from_grayscale_patches(p_uncertainty,i_img)[0]
         uncertainty = uncertainty[:img.shape[0], :img.shape[1]]
         uncertainty_img = (65535 * uncertainty).astype(np.uint16)
-        cv2.imwrite(str(Path(out_path, filename.stem + '_uncertainty.png')), uncertainty_img)
+        io.imsave(Path(out_path, filename.stem + '_uncertainty.png'), uncertainty_img)
+
+        confidence_img = mask_predicted[:,:,None] * np.ones((img.shape[0], img.shape[1], 3)) # broadcast to rgb img
+        confidence_img = confidence_img.astype(np.uint8)
+        confidence_img[uncertainty > uncertainty_threshold, :] = np.array([255, 0,0])   # make  uncertain pixels red
+        io.imsave(Path(out_path, filename.stem + '_confidence.png'), confidence_img)
         #np.save(Path(out_path, filename.stem + '_uncertainty.npy'), uncertainty)
 
 
@@ -124,8 +129,9 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, p
 
     # Try different cutoff points
     dice = []
-    for i in range(1,10):
-        cutoff = i/10
+    cutoff_range = np.arange(0.3, 0.725, 0.025)
+
+    for cutoff in cutoff_range:
         pred_bin = [pred >= cutoff for pred in pred_imgs]
         dice_mean = np.mean(evaluate_dice_only(imgs, gt_imgs, pred_bin))
         dice.append(dice_mean)
@@ -135,12 +141,12 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, p
 
     np.save(Path(out_path, 'dice_cutoff.npy'), dice)  # Save all values for later plot changes
     max_dice = dice[argmax]
-    max_cutoff = (np.arange(1,10)/10)[argmax]
+    max_cutoff = cutoff_range[argmax]
 
     plt.rcParams.update({'font.size': 18})
     plt.figure()
     plt.plot((max_cutoff, max_cutoff),(0, max_dice), linestyle=':', linewidth=2, color='grey')
-    plt.plot(np.arange(1,10)/10, dice)
+    plt.plot(cutoff_range, dice)
     plt.annotate(f'{max_dice:.2f}', (max_cutoff, max_dice), fontsize='x-small')
     plt.ylabel('Dice')
     plt.xlabel('Cutoff Point')
@@ -152,12 +158,12 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, p
 
 
 
-if __name__ is '__main__':
+if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Glacier Front Segmentation Prediction')
     parser.add_argument('--model_path', type=str, help='Path containing trained model')
     parser.add_argument('--img_path', type=str, help='Path containing images to be segmented')
     parser.add_argument('--out_path', type=str, help='output path for predictions')
-    parser.add_argument('--gt_path', type=str, help='Path containing the ground truth, necessary for evaluation')
+    parser.add_argument('--gt_path', type=str, help='Path containing the ground truth, necessary for evaluation_scripts')
     parser.add_argument('--batch_size', default=1, type=int, help='batch size (integer value)')
     parser.add_argument('--cutoff', type=float, help='cutoff point of binarisation')
     args = parser.parse_args()

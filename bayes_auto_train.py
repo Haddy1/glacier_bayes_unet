@@ -5,7 +5,6 @@ from pathlib import Path
 from skimage import io
 import numpy as np
 import os
-import main as train_main
 from distutils.dir_util import copy_tree
 from shutil import copy
 from layers.BayesDropout import  BayesDropout
@@ -54,7 +53,6 @@ if not Path(out_path, 'train', 'masks').exists():
 if not Path(out_path, 'unlabeled').exists():
     Path(out_path, 'unlabeled').mkdir(parents=True)
 
-copy_tree(str(Path(args.data_path, 'val')), str(Path(out_path, 'val')))
 copy(Path(data_path, 'options.json'), Path(out_path, 'options.json'))
 
 for f in Path(args.data_path, 'unlabeled').glob('*.png'):

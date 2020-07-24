@@ -50,21 +50,21 @@ def evaluate(img_path, gt_path, prediction_path):
         scores['sensitivity'].append(recall_score(gt_flat, pred_flat))
 
         if Path(prediction_path, filename.stem + '_uncertainty.png').exists():
-            if not 'uncertainty_mean' in scores:
-                scores['uncertainty_mean'] = []
-                scores['uncertainty_var'] = []
+            if not 'uncertainty' in scores:
+                scores['uncertainty'] = []
 
             uncertainty_img = io.imread(Path(prediction_path, filename.stem + '_uncertainty.png'), as_gray=True)
             uncertainty = uncertainty_img / 65535
-            scores['uncertainty_mean'].append(uncertainty.mean())
-            scores['uncertainty_var'].append(uncertainty.var())
+            scores['uncertainty'].append(uncertainty.mean())
             plt.figure()
             sns.heatmap(uncertainty, vmin=0, vmax=0.15, xticklabels=False, yticklabels=False)
             plt.savefig(Path(prediction_path, filename.stem + '_heatmap.png'), bbox_inches='tight', format='png', dpi=300)
             plt.close()
 
-            diff = 255 * (gt != pred).astype(np.uint8)
-            io.imsave(Path(prediction_path, filename.stem + '_diff.png'), diff)
+
+
+        diff = 255 * (gt != pred).astype(np.uint8)
+        io.imsave(Path(prediction_path, filename.stem + '_diff.png'), diff, check_contrast=False)
 
 
     scores = pd.DataFrame.from_dict(scores)
@@ -148,15 +148,16 @@ def eval_uncertainty(file, out_file, vmin=0, vmax=0.2):
     plt.savefig(out_file, bbox_inches='tight', format='png', dpi=200)
 
 if __name__ is '__main__':
-    path = Path('/home/andreas/glacier-front-detection/output_bayes/bayes')
-    test_path = Path('/home/andreas/glacier-front-detection/front_detection_dataset/test')
+    #path = Path('/home/andreas/glacier-front-detection/output_bayes/uncertainty_flip')
+
+    #test_path = Path('/home/andreas/glacier-front-detection/front_detection_dataset/test')
     #history = pickle.load(open(next(path.glob('history*.pkl')), 'rb'))
     #history = pd.read_csv(Path(path,'model_1_history.csv'))
     #plot_history(history, Path(path, 'loss_plot.png') , xlim=(-10,30), ylim=(0,0.75), title='Set1')
 
-    evaluate(Path(test_path, 'images'), Path(test_path, 'masks'), path)
-    #for d in Path('/home/andreas/glacier-front-detection/output_bayes').iterdir():
-    #    if d.is_dir():
-    #        #evaluate(Path('/home/andreas/glacier-front-detection/front_detection_dataset/test'), d)
-    #        history = pickle.load(open(next(d.glob('history*.pkl')), 'rb'))
-    #        plot_history(history, Path(d, 'loss_plot.png') , xlim=(-10,120), ylim=(0,1.5))
+    #evaluate(Path(test_path, 'images'), Path(test_path, 'masks'), path)
+    for d in Path('/home/andreas/glacier-front-detection/output_bayes').iterdir():
+        if d.is_dir():
+            #evaluate(Path('/home/andreas/glacier-front-detection/front_detection_dataset/test'), d)
+            history = pickle.load(open(next(d.glob('history*.pkl')), 'rb'))
+            plot_history(history, Path(d, 'loss_plot.png') , xlim=(-10,130), ylim=(0,0.8))
