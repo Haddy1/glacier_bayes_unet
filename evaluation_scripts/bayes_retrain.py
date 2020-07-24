@@ -8,20 +8,25 @@ import matplotlib.pyplot as plt
 
 out = Path('/home/andreas/thesis/reports/bayes')
 plt.rcParams.update({'font.size': 18})
-path = Path('/home/andreas/glacier-front-detection/reverse_classification_split_01')
+path = Path('/home/andreas/glacier-front-detection/output_split')
 
 scores = pd.read_pickle('../output_bayes/bayes/scores.pkl')
-train_imgs = json.load(open('../output_bayes/bayes/train_image_list.json', 'r')).keys()
-n_train_imgs = [len(train_imgs)]
-iterations = [0]
-dice = [scores['dice'].mean()]
-scores = pd.read_pickle(Path(path, 'dataset_16_06_split/output/scores.pkl'))
-train_imgs = json.load(open(Path(path, 'dataset_16_06_split/train/patches/train_image_list.json', 'r')).keys())
-n_train_imgs.append(len(train_imgs))
-dice.append(scores['dice'].mean())
-iterations.append(0.5)
+#train_imgs = json.load(open('../output_bayes/bayes/train_image_list.json', 'r')).keys()
+#n_train_imgs = [len(train_imgs)]
+#iterations = [0]
+#dice = [scores['dice'].mean()]
+#scores = pd.read_pickle(Path(path, 'data_split/output/scores.pkl'))
+#train_imgs = json.load(open(Path(path, 'data_split/train_image_list.json'), 'r')).keys()
+#n_train_imgs = [len(train_imgs)]
+#dice.append(scores['dice'].mean())
+#iterations.append(0.5)
+iterations = []
+dice = []
+n_train_imgs = []
 for score_file in path.rglob('scores.pkl'):
     dirname = score_file.parent.parent.stem
+    if dirname == 'data_split':
+        continue
     i = int(dirname[dirname.rfind('_')+1:])
     train_imgs = json.load(open(Path(score_file.parent.parent, 'train_image_list.json'), 'r')).keys()
     n_train_imgs.append(len(train_imgs))
@@ -52,5 +57,7 @@ ax2.set_ylabel('Nr Training Imgs', color=color)
 ax2.plot(n_train_imgs, color=color)
 ax2.tick_params(axis='y', labelcolor=color)
 #plt.savefig()
-plt.savefig(str(Path(out, 'imgs', 'autotrain_split.png')), bbox_inches='tight', format='png', dpi=200)
+plt.savefig(str(Path(out, 'imgs', 'autotrain.png')), bbox_inches='tight', format='png', dpi=200)
 plt.show()
+
+print(n_train_imgs.sum())

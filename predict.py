@@ -129,8 +129,9 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, p
 
     # Try different cutoff points
     dice = []
-    for i in range(1,10):
-        cutoff = i/10
+    cutoff_range = np.arange(0.3, 0.725, 0.025)
+
+    for cutoff in cutoff_range:
         pred_bin = [pred >= cutoff for pred in pred_imgs]
         dice_mean = np.mean(evaluate_dice_only(imgs, gt_imgs, pred_bin))
         dice.append(dice_mean)
@@ -140,12 +141,12 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, p
 
     np.save(Path(out_path, 'dice_cutoff.npy'), dice)  # Save all values for later plot changes
     max_dice = dice[argmax]
-    max_cutoff = (np.arange(1,10)/10)[argmax]
+    max_cutoff = cutoff_range[argmax]
 
     plt.rcParams.update({'font.size': 18})
     plt.figure()
     plt.plot((max_cutoff, max_cutoff),(0, max_dice), linestyle=':', linewidth=2, color='grey')
-    plt.plot(np.arange(1,10)/10, dice)
+    plt.plot(cutoff_range, dice)
     plt.annotate(f'{max_dice:.2f}', (max_cutoff, max_dice), fontsize='x-small')
     plt.ylabel('Dice')
     plt.xlabel('Cutoff Point')
