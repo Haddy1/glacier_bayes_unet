@@ -69,6 +69,10 @@ def evaluate(img_path, gt_path, prediction_path):
 
     scores = pd.DataFrame.from_dict(scores)
     print(prediction_path)
+
+
+    scores = pd.DataFrame.from_dict(scores)
+    print(prediction_path)
     print('Dice\tIOU\tEucl\tSensitivity\tSpecificitiy')
     print(
                   str(np.mean(scores['dice'])) + '\t'
