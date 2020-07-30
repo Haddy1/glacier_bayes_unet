@@ -172,12 +172,12 @@ if __name__ == "__main__":
 
     preprocessor = preprocessor.Preprocessor()
 
-    out_dir = Path('/home/oc39otib/glacier-front-detection/data_split')
-    data_dir = Path('/home/oc39otib/glacier-front-detection/front_detection_dataset')
-    split_set(Path(data_dir, 'train'), Path(out_dir, 'train'), Path(out_dir, 'unlabeled'), split=0.5)
+    out_dir = Path('/home/andreas/glacier-front-detection/data_split')
+    data_dir = Path('/home/andreas/glacier-front-detection/front_detection_dataset')
+    #split_set(Path(data_dir, 'train'), Path(out_dir, 'train'), Path(out_dir, 'unlabeled'), split=0.5)
     #generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patch_size=None)
 
-    #generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patch_size=None)
+    generate_subset(Path(out_dir, 'train'), Path(out_dir, 'train'), patch_size=256)
     #split_set(Path(data_dir), Path(out_dir, 'unlabeled'), Path(out_dir, 'tmp'), split=0.6)
     #generate_subset(Path(out_dir, 'tmp/set1'), Path(out_dir, 'train1'), patch_size=patch_size,patches_only=True)
     #generate_subset(Path(out_dir, 'tmp/set2'), Path(out_dir, 'train2'), patch_size=patch_size,patches_only=True)

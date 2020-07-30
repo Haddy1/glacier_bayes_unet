@@ -54,15 +54,30 @@ if not Path(out_path, 'unlabeled').exists():
     Path(out_path, 'unlabeled').mkdir(parents=True)
 
 copy(Path(data_path, 'options.json'), Path(out_path, 'options.json'))
-
+min_uncert = np.ones(4)
+min_imgs = 4 * [""]
 for f in Path(args.data_path, 'unlabeled').glob('*.png'):
     uncertainty_img = io.imread(Path(data_path, f.stem + '_uncertainty.png'), as_gray=True)
     uncertainty = uncertainty_img / 65535
-    if np.mean(uncertainty) < args.threshold:
+    uncertainty_mean = np.mean(uncertainty)
+    if uncertainty_mean < min_uncert.max():
+        min_uncert[min_uncert.argmax()] = uncertainty_mean
+        min_imgs[min_uncert.argmax()] = f.stem
+
+for f in Path(args.data_path, 'unlabeled').glob('*.png'):
+    if f.stem in min_imgs:
         copy(f, Path(out_path, 'train', 'images', f.name))
         copy(Path(data_path, f.stem + '_pred.png'), Path(out_path, 'train', 'masks', f.stem + '_zones.png'))
     else:
         copy(f, Path(out_path, 'unlabeled', f.name))
+
+
+
+    #if np.mean(uncertainty) < args.threshold:
+    #    copy(f, Path(out_path, 'train', 'images', f.name))
+    #    copy(Path(data_path, f.stem + '_pred.png'), Path(out_path, 'train', 'masks', f.stem + '_zones.png'))
+    #else:
+    #    copy(f, Path(out_path, 'unlabeled', f.name))
 
 
 
