@@ -156,6 +156,58 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, p
 
     return max_cutoff
 
+def predict_patches_only(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 20, uncertainty_threshold=1e-3):
+    if not Path(out_path).exists():
+        Path(out_path).mkdir(parents=True)
+
+    Path(out_path, 'images').mkdir()
+    Path(out_path, 'masks').mkdir()
+    Path(out_path, 'uncertainty').mkdir()
+
+    patches = []
+    for filename in Path(img_path).rglob('*.png'):
+        #print(filename)
+        img = io.imread(filename, as_gray=True)
+        if preprocessor is not None:
+            img = preprocessor.process(img)
+        img = img / 255
+        if img.shape != (256,256):
+            img_pad = cv2.copyMakeBorder(img, 0, (patch_size - img.shape[0]) % patch_size, 0, (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
+            p_img, i_img = extract_grayscale_patches(img_pad, (patch_size, patch_size), stride = (patch_size, patch_size))
+            p_img = np.reshape(p_img,p_img.shape+(1,))
+            patches + p_img
+        else:
+            patches.append(img)
+
+        patches = np.array(patches)
+
+    predictions = []
+    for i in range(mc_iterations):
+        prediction = model.predict(patches, batch_size=batch_size)
+        predictions.append(prediction)
+    predictions = np.array(predictions)
+    patches_predicted = predictions.mean(axis=0)
+    patches_uncertainty = predictions.var(axis=0)
+
+    i = 0
+    for patch, mask_predicted, uncertainty in zip(patches, patches_predicted, patches_uncertainty):
+
+        io.imsave(Path(out_path, 'images', str(i) + '.png'), patch.astype(np.uint8))
+
+
+        if cutoff is not None:
+            # thresholding to make binary mask
+            mask_predicted[mask_predicted < cutoff] = 0
+            mask_predicted[mask_predicted >= cutoff] = 255
+        else:
+            mask_predicted = 255 * mask_predicted
+
+        io.imsave(Path(out_path, 'masks', str(i) + '.png'), mask_predicted.astype(np.uint8))
+
+        uncertainty_img = (65535 * uncertainty).astype(np.uint16)
+        io.imsave(Path(out_path, 'uncertainty', str(i) + '.png'), uncertainty_img)
+
+        i += 1
 
 
 if __name__ == '__main__':
