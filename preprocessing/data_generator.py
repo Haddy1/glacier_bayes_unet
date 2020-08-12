@@ -83,6 +83,10 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
 
 
 def generate_subset(data_dir, out_dir, set_size=None, patch_size=256, preprocessor=None, augment=None, patches_only=False, split=None, img_list=None):
+    if not Path(data_dir).exists():
+        print(str(data_dir) + " does not exist")
+
+
     if img_list is not None:
         files_img = img_list
     else:
@@ -175,11 +179,11 @@ if __name__ == "__main__":
 
     preprocessor = preprocessor.Preprocessor()
 
-    out_dir = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_split')
-    data_dir = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn')
+    out_dir = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_split_128')
+    data_dir = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_split')
 
     #split_set(Path(data_dir, 'train'), Path(out_dir, 'train'), Path(out_dir, 'unlabeled'), split=0.5)
-    generate_subset(Path(out_dir, 'train'), Path(out_dir, 'train'), patch_size=256)
+    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patch_size=128)
     #generate_subset(Path(out_dir, 'val'), Path(out_dir, 'val'), patch_size=256)
     #generate_subset(Path(out_dir, 'test'), Path(out_dir, 'test'), patch_size=256)
     #split_set(Path(out_dir, 'rest'), Path(out_dir, 'val'), Path(out_dir, 'test'), split=0.5)

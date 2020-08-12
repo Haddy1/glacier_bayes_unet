@@ -16,7 +16,7 @@ import json
 import pickle
 from utils.evaluate import evaluate
 from train import train
-from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger
+from keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger
 
 
 parser = argparse.ArgumentParser(description='Glacier Front Segmentation')
@@ -52,16 +52,18 @@ cutoff = options['cutoff']
 img_path = Path(args.img_path)
 iter_path = Path(args.out_path, str(0))
 if not iter_path.exists():
-    iter_path.mkdir()
-for iter in range(np.max_iterations):
+    iter_path.mkdir(parents=True)
+for iter in range(args.max_iterations):
     train_path = Path(iter_path, 'train')
-    train_path.mkdir()
+    if not train_path.exists():
+        train_path.mkdir()
 
 
 
     predict_patches_only(model, img_path, train_path, batch_size=batch_size, patch_size=patch_size, cutoff=cutoff)
     unlabeled_path = Path(iter_path, 'unlabeled')
-    unlabeled_path.mkdir()
+    if not unlabeled_path.exists():
+        unlabeled_path.mkdir()
     for f in Path(train_path, 'images').glob('*.png'):
         img = io.imread(f, as_gray=True)
         if img.var() < args.var_threshold:  # Remove images where not much is going on
@@ -96,25 +98,6 @@ for iter in range(np.max_iterations):
         test_path = Path(args.test_path)
         predict_bayes(model, Path(test_path, 'images'), Path(new_iter_path, 'eval'), batch_size=batch_size, patch_size=patch_size, cutoff=cutoff)
         evaluate(Path(test_path, 'images'), Path(test_path, 'masks'), Path(new_iter_path, 'eval'))
-
-
-
-
-
-
-
-
-
-
-
-
-    #if np.mean(uncertainty) < args.threshold:
-    #    copy(f, Path(out_path, 'train', 'images', f.name))
-    #    copy(Path(data_path, f.stem + '_pred.png'), Path(out_path, 'train', 'masks', f.stem + '_zones.png'))
-    #else:
-    #    copy(f, Path(out_path, 'unlabeled', f.name))
-
-
 
 
 
