@@ -181,7 +181,7 @@ def predict_patches_only(model, img_path, out_path, batch_size=16, patch_size=25
         else:
             patches.append(img)
 
-    for b_index in range(len(patches) % batch_size):
+    for b_index in range(len(patches) // batch_size):
         if (b_index+1 * batch_size < len(patches)):
             batch = np.array(patches[b_index * batch_size:(b_index+1)*batch_size])
         else:
@@ -196,9 +196,12 @@ def predict_patches_only(model, img_path, out_path, batch_size=16, patch_size=25
         predictions = np.array(predictions)
         patches_predicted = predictions.mean(axis=0)
         patches_uncertainty = predictions.var(axis=0)
+        batch = np.reshape(batch, batch.shape[:-1])
+        patches_predicted = patches_predicted.reshape(batch.shape)
+        patches_uncertainty = patches_uncertainty.reshape(batch.shape)
 
-        i = 0
-        for patch, mask_predicted, uncertainty in zip(patches, patches_predicted, patches_uncertainty):
+        i = b_index * batch_size
+        for patch, mask_predicted, uncertainty in zip(batch, patches_predicted, patches_uncertainty):
 
             io.imsave(Path(out_path, 'images', str(i) + '.png'), patch.astype(np.uint8))
 

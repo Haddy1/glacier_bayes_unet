@@ -73,7 +73,7 @@ for iter in range(args.max_iterations):
             continue
 
 
-        uncertainty_img = io.imread(Path(iter_path, 'uncertainty', f.name))
+        uncertainty_img = io.imread(Path(train_path, 'uncertainty', f.name))
         uncertainty = uncertainty_img / 65535
 
         if uncertainty.mean > args.threshold:
@@ -82,7 +82,8 @@ for iter in range(args.max_iterations):
             os.remove(Path(train_path, 'masks', f.name))
 
     # no new appropiate images for training => stop autotrainging
-    if len(list(train_path, 'images').glob('*.png')) == 0:
+    if len(list(Path(train_path, 'images').glob('*.png'))) == 0:
+        print("No images with low enough uncertainty left")
         break
 
     Path(iter_path, 'val').symlink_to(args.val_path, target_is_directory=True)
