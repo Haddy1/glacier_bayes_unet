@@ -8,20 +8,21 @@ import json
 import pickle
 import matplotlib.pyplot as plt
 
-def train(model, data_path, out_path, patch_size=256, batch_size=16, callbacks=None, epochs=250, preprocessor = None):
-    data_path = Path(data_path)
-    patches_path_train = Path(data_path, 'train/patches')
+def train(model, train_path, val_path, out_path, patch_size=256, batch_size=16, callbacks=None, epochs=250, preprocessor = None):
+    patches_path_train = Path(train_path, 'patches')
     if not patches_path_train.exists() or not Path(patches_path_train, 'image_list.json').exists() or len(json.load(open(Path(patches_path_train, 'image_list.json'), 'r')).keys()) == 0:
-        data_generator.process_data(Path(data_path, 'train'), Path(patches_path_train), patch_size=patch_size,
+        data_generator.process_data(train_path, patches_path_train, patch_size=patch_size,
                                     preprocessor=preprocessor)
 
-    patches_path_val = Path(data_path, 'val/patches')
+    patches_path_val = Path(val_path, 'patches')
     if not patches_path_val.exists() or not Path(patches_path_val, 'image_list.json').exists() or len(json.load(open(Path(patches_path_val, 'image_list.json'), 'r')).keys()) == 0:
-        data_generator.process_data(Path(data_path, 'val'), Path(patches_path_val), patch_size=patch_size,
+        data_generator.process_data(val_path, patches_path_val, patch_size=patch_size,
                                     preprocessor=preprocessor)
 
     num_samples = len([file for file in Path(patches_path_train, 'images').rglob('*.png')])  # number of training samples
     num_val_samples = len([file for file in Path(patches_path_val, 'images').rglob('*.png')])  # number of val samples
+    print(num_samples)
+    print(num_val_samples)
 
     # copy image file list to output
     if Path(patches_path_train, 'image_list.json').exists():
@@ -32,6 +33,7 @@ def train(model, data_path, out_path, patch_size=256, batch_size=16, callbacks=N
                                      train_path=str(patches_path_train),
                                      image_folder='images',
                                      mask_folder='masks',
+                                     aug_dict=None,
                                      save_to_dir=None)
 
     val_Generator = trainGenerator(batch_size=batch_size,

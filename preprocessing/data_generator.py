@@ -10,7 +10,7 @@ from shutil import copy, rmtree
 
 
 
-def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=None, augment = None):
+def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=None, augment = None, front_zone_only=False):
 
     if not Path(out_dir).exists():
         Path(out_dir).mkdir(parents=True)
@@ -39,9 +39,6 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
         mask_zones = cv2.imread(str(Path(in_dir, 'masks', basename + '_zones.png')), cv2.IMREAD_GRAYSCALE)
         mask_zones = cv2.copyMakeBorder(mask_zones, 0, (patch_size - mask_zones.shape[0]) % patch_size, 0, (patch_size - mask_zones.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
 
-
-
-
         mask_zones[mask_zones == 127] = 0
         mask_zones[mask_zones == 254] = 255
 
@@ -58,6 +55,17 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
 
             p_mask_zones, i_mask_zones = image_patches.extract_grayscale_patches(mask_zones, (patch_size, patch_size), stride = (patch_size, patch_size))
             p_img, i_img = image_patches.extract_grayscale_patches(img, (patch_size, patch_size), stride = (patch_size, patch_size))
+
+            if front_zone_only:
+                front_indices = []
+                for i in range(p_mask_zones.shape[0]):
+                    if 0 in p_mask_zones[i] and 255 in p_mask_zones[i]:
+                        front_indices.append(i)
+                front_indices = np.array(front_indices).astype(np.int)
+                p_mask_zones = p_mask_zones[front_indices]
+                i_mask_zones = (i_mask_zones[0][front_indices], i_mask_zones[1][front_indices])
+                p_img = p_img[front_indices]
+
 
             patch_indices = []
             for j in range(p_mask_zones.shape[0]):
@@ -82,7 +90,7 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
         json.dump(img_patch_index, f)
 
 
-def generate_subset(data_dir, out_dir, set_size=None, patch_size=256, preprocessor=None, augment=None, patches_only=False, split=None, img_list=None):
+def generate_subset(data_dir, out_dir, set_size=None, patch_size=256, preprocessor=None, augment=None, patches_only=False, split=None, img_list=None, front_zone_only=False):
     if not Path(data_dir).exists():
         print(str(data_dir) + " does not exist")
 
@@ -125,7 +133,7 @@ def generate_subset(data_dir, out_dir, set_size=None, patch_size=256, preprocess
                 cv2.imwrite(str(Path(out_dir, 'masks', basename + augmentation + '_zones.png')), mask_zones)
 
     if patch_size is not None:
-        process_data(data_dir, Path(out_dir, 'patches'), patch_size=patch_size, preprocessor=preprocessor, img_list=img_subset, augment=augment)
+        process_data(data_dir, Path(out_dir, 'patches'), patch_size=patch_size, preprocessor=preprocessor, img_list=img_subset, augment=augment, front_zone_only=front_zone_only)
 
 
 def split_set(data_dir, out_dir1, out_dir2, split):
@@ -173,17 +181,19 @@ def bayes_train_gen(img_path, pred_path, out_path, uncertainty_threshold = 1e-3)
             copy(Path(pred_path, basename + '_pred.png'), Path(out_path, 'images'))
 
 
+
 if __name__ == "__main__":
     random.seed(42)
     patch_size = 256
 
     preprocessor = preprocessor.Preprocessor()
 
-    out_dir = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_split_128')
-    data_dir = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_split')
+    out_dir = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_flip')
+    data_dir = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn')
 
-    #split_set(Path(data_dir, 'train'), Path(out_dir, 'train'), Path(out_dir, 'unlabeled'), split=0.5)
-    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patch_size=128)
+    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patch_size=256, front_zone_only=True, patches_only=True, augment=augmentation.flip)
+    #generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patch_size=256, front_zone_only=True, augment=augmentation.flip)
+    #generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patch_size=256, front_zone_only=True)
     #generate_subset(Path(out_dir, 'val'), Path(out_dir, 'val'), patch_size=256)
     #generate_subset(Path(out_dir, 'test'), Path(out_dir, 'test'), patch_size=256)
     #split_set(Path(out_dir, 'rest'), Path(out_dir, 'val'), Path(out_dir, 'test'), split=0.5)

@@ -93,7 +93,7 @@ def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cuto
         uncertainty = reconstruct_from_grayscale_patches(p_uncertainty,i_img)[0]
         uncertainty = uncertainty[:img.shape[0], :img.shape[1]]
         uncertainty_img = (65535 * uncertainty).astype(np.uint16)
-        io.imsave(Path(out_path, filename.stem + '_uncertainty.png'), uncertainty_img)
+        io.imsave(Path(out_path, filename.stem + '_uncertainty.png'), uncertainty_img, check_contrast=False )
 
         confidence_img = mask_predicted[:,:,None] * np.ones((img.shape[0], img.shape[1], 3)) # broadcast to rgb img
         confidence_img = confidence_img.astype(np.uint8)
@@ -181,7 +181,7 @@ def predict_patches_only(model, img_path, out_path, batch_size=16, patch_size=25
         else:
             patches.append(img)
 
-    for b_index in range(len(patches) // batch_size):
+    for b_index in range((len(patches) // batch_size) +1):
         if (b_index+1 * batch_size < len(patches)):
             batch = np.array(patches[b_index * batch_size:(b_index+1)*batch_size])
         else:
@@ -202,7 +202,7 @@ def predict_patches_only(model, img_path, out_path, batch_size=16, patch_size=25
 
         i = b_index * batch_size
         for patch, mask_predicted, uncertainty in zip(batch, patches_predicted, patches_uncertainty):
-
+            patch = 255 * patch
             io.imsave(Path(out_path, 'images', str(i) + '.png'), patch.astype(np.uint8))
 
 
@@ -216,7 +216,7 @@ def predict_patches_only(model, img_path, out_path, batch_size=16, patch_size=25
             io.imsave(Path(out_path, 'masks', str(i) + '.png'), mask_predicted.astype(np.uint8))
 
             uncertainty_img = (65535 * uncertainty).astype(np.uint16)
-            io.imsave(Path(out_path, 'uncertainty', str(i) + '.png'), uncertainty_img)
+            io.imsave(Path(out_path, 'uncertainty', str(i) + '.png'), uncertainty_img, check_contrast=False )
 
             i += 1
 
