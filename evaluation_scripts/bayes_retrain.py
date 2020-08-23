@@ -5,12 +5,13 @@ import cv2
 import pandas as pd
 import json
 import matplotlib.pyplot as plt
+from shutil import copy
 
-out = Path('/home/andreas/thesis/reports/bayes')
+out = Path('/home/andreas/thesis/reports/pix2pix')
 plt.rcParams.update({'font.size': 18})
-path = Path('/home/andreas/glacier-front-detection/output_split')
+path = Path('/home/andreas/glacier-front-detection/output_autotrain')
 
-scores = pd.read_pickle('../output_bayes/bayes/scores.pkl')
+#scores = pd.read_pickle('../output_bayes/bayes/scores.pkl')
 #train_imgs = json.load(open('../output_bayes/bayes/train_image_list.json', 'r')).keys()
 #n_train_imgs = [len(train_imgs)]
 #iterations = [0]
@@ -27,13 +28,27 @@ for score_file in path.rglob('scores.pkl'):
     dirname = score_file.parent.parent.stem
     if dirname == 'data_split':
         continue
-    i = int(dirname[dirname.rfind('_')+1:])
-    train_imgs = json.load(open(Path(score_file.parent.parent, 'train_image_list.json'), 'r')).keys()
-    n_train_imgs.append(len(train_imgs))
+    i = int(dirname)
+    if i > 0:
+
+        n_train_imgs.append(len(list(Path(path,str(i-1), 'train/patches/images').glob('*.png'))))
+    if i == 0:
+        n_train_imgs.append(0)
+    #train_imgs = json.load(open(Path(score_file.parent.parent, 'train_image_list.json'), 'r')).keys()
+    #n_train_imgs.append(len(train_imgs))
 
     iterations.append(i)
-    scores = pd.read_pickle(score_file)
-    dice.append(scores['dice'].mean())
+    #scores = pd.read_pickle(score_file)
+    with open(Path(score_file.parent, 'ReportOnModel.txt'), 'r') as f:
+        scores = (f.readlines()[1]).split()
+        dice_value = float(scores[0])
+
+
+    #dice.append(scores['dice'].mean())
+    dice.append(dice_value)
+
+    copy(Path(score_file.parent.parent, 'loss_plot.png'), Path(out, 'imgs', 'autotrain_loss_plot' + str(i) + '.png'))
+
 
 iterations = np.array(iterations)
 dice = np.array(dice)

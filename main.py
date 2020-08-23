@@ -107,11 +107,15 @@ if __name__ == '__main__':
 
     patches_path_train = Path(data_path, 'train/patches')
     if not patches_path_train.exists() or not Path(patches_path_train, 'image_list.json').exists() or len(json.load(open(Path(patches_path_train, 'image_list.json'), 'r')).keys()) == 0:
+        if args.patches_only:
+            patches_path_train = Path(data_path, 'train')
         data_generator.process_data(Path(data_path, 'train'), Path(patches_path_train), patch_size=patch_size,
                                         preprocessor=preprocessor)
 
     patches_path_val = Path(data_path, 'val/patches')
     if not patches_path_val.exists() or not Path(patches_path_val, 'image_list.json').exists() or len(json.load(open(Path(patches_path_val, 'image_list.json'), 'r')).keys()) == 0:
+        if args.patches_only:
+            patches_path_val = Path(data_path, 'val')
         data_generator.process_data(Path(data_path, 'val'), Path(patches_path_val), patch_size=patch_size,
                                         preprocessor=preprocessor)
 

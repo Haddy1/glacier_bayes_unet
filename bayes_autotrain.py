@@ -17,7 +17,6 @@ import pickle
 from utils.evaluate import evaluate
 from train import train
 from keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger
-import cupy as cp
 
 
 parser = argparse.ArgumentParser(description='Glacier Front Segmentation')
@@ -98,8 +97,6 @@ for iter in range(args.max_iterations):
         print("No images with low enough uncertainty left")
         break
 
-    if not Path(iter_path, 'val').exists:
-        Path(iter_path, 'val').symlink_to(Path(args.val_path).absolute(), target_is_directory=True)
     callbacks = []
     callbacks.append(EarlyStopping('val_loss', patience=patience, verbose=0, mode='auto', restore_best_weights=True))
 
@@ -112,6 +109,7 @@ for iter in range(args.max_iterations):
         test_path = Path(args.test_path)
         predict_bayes(model, Path(test_path, 'images'), Path(new_iter_path, 'eval'), batch_size=batch_size, patch_size=patch_size, cutoff=cutoff)
         evaluate(Path(test_path, 'images'), Path(test_path, 'masks'), Path(new_iter_path, 'eval'))
+    img_path = Path(iter_path, 'unlabeled')
     iter_path = new_iter_path
 
 
