@@ -14,17 +14,18 @@ import os
 os.chdir('../')
 plt.rcParams.update({'font.size': 18})
 
-identifier = 'bayes'
-path = Path('/home/andreas/glacier-front-detection/output_bayes/' + identifier)
-out = Path('/home/andreas/thesis/reports/bayes')
+identifier = 'Retrain_Binary_Crossentropy'
+path = Path('/home/andreas/glacier-front-detection/output_pix2pix/' + identifier)
+out = Path('/home/andreas/thesis/reports/pix2pix')
 if not out.exists():
     out.mkdir(parents=True)
 if not Path(out, 'imgs').exists():
     Path(out, 'imgs').mkdir()
 
 
-for i in ['2006-02-23_RSAT_20_3', '1993-08-29_ERS_20_5', '2011-09-21_TDX_5_1']:
-    copy(Path('/home/andreas/glacier-front-detection/front_detection_dataset/test/images', i + '.png'), Path(out, 'imgs', i + '.png'))
+#for i in ['2006-02-23_RSAT_20_3', '1993-08-29_ERS_20_5', '2011-09-21_TDX_5_1']:
+for i in ['2009-08-04_TSX_6_1', '2014-07-25_TSX_6_1']:
+    copy(Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn/test/images/', i + '.png'), Path(out, 'imgs', i + '.png'))
     copy(Path(path, i + '_pred.png'), Path(out, 'imgs', i + '_pred.png'))
     #copy(Path(path, i + '_diff.png'), Path(out, 'imgs', i + '_diff.png'))
 
@@ -52,26 +53,26 @@ def fperc(x):
     return str(round(x * 100,2))
 
 
-#with open(Path(out,'results_' +identifier + '.tex'), 'w') as f:
-#    for column in scores.columns:
-#        if column == 'image':
-#            continue
-#        if column == 'euclidian':
-#            f.write(' & ' + column + ' (\pm SD)')
-#        else:
-#            f.write(' & ' + column + '\% (\pm SD)')
-#    f.write(' \\\\\n')
-#    for label , results in scores.groupby(level=0, sort=False):
-#        line = label
-#        for column in results.columns:
-#            if column == 'image':
-#                continue
-#            if column == 'euclidian':
-#                line += ' & ' + str(round(results[column].mean(),2)) + ' (\\pm ' + str(round(results[column].std(), 2)) + ')'
-#            else:
-#                line += ' & ' + fperc(results[column].mean()) + ' (\\pm ' + fperc(results[column].std()) + ')'
-#        line += " \\\\\n"
-#        f.write(line)
+with open(Path(out,'results_' +identifier + '.tex'), 'w') as f:
+    for column in scores.columns:
+        if column == 'image':
+            continue
+        if column == 'euclidian':
+            f.write(' & ' + column + ' (\pm SD)')
+        else:
+            f.write(' & ' + column + '\% (\pm SD)')
+    f.write(' \\\\\n')
+    for label , results in scores.groupby(level=0, sort=False):
+        line = label
+        for column in results.columns:
+            if column == 'image':
+                continue
+            if column == 'euclidian':
+                line += ' & ' + str(round(results[column].mean(),2)) + ' (\\pm ' + str(round(results[column].std(), 2)) + ')'
+            else:
+                line += ' & ' + fperc(results[column].mean()) + ' (\\pm ' + fperc(results[column].std()) + ')'
+        line += " \\\\\n"
+        f.write(line)
 
 #%%
 bin_scores = []
