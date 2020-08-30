@@ -25,6 +25,8 @@ def evaluate(img_path, gt_path, prediction_path):
     for filename in Path(img_path).rglob('*.png'):
 
         gt_name = filename.name.partition('.')[0] + '_zones.png'
+        if not Path(gt_path, gt_name).exists():
+            gt_name = filename.name.partition('.')[0] + '.png'
         gt_img = io.imread(str(Path(gt_path,gt_name)), as_gray=True)
         if (Path(prediction_path, filename.stem + '_pred.png')).exists():
             pred_img = io.imread(Path(prediction_path, filename.stem + '_pred.png'), as_gray=True)
