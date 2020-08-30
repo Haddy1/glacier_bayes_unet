@@ -103,11 +103,14 @@ def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cuto
 
 
 def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, preprocessor=None):
-    tmp_dir = Path(out_path, 'cutoff_tmp')
+    tmp_dir = Path(out_path, 'cutoff_tmp', patches_only=False)
 
     if 'bayes' in model.name:
-        predict_bayes(model, Path(val_path, 'images'), tmp_dir, batch_size=batch_size,
-                patch_size=patch_size, preprocessor=preprocessor, cutoff=None)
+        if patches_only:
+            predict_patches_only(model, args.img_path, out_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
+        else:
+            predict_bayes(model, Path(val_path, 'images'), tmp_dir, batch_size=batch_size,
+                    patch_size=patch_size, preprocessor=preprocessor, cutoff=None)
     else:
         predict(model, Path(val_path, 'images'), tmp_dir, batch_size=batch_size,
                 patch_size=patch_size, preprocessor=preprocessor, cutoff=None)
@@ -119,7 +122,10 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, p
     for filename in Path(val_path, 'images').glob('*.png'):
         imgs.append(io.imread(filename, as_gray=True))
 
-        gt_imgs.append(io.imread(Path(val_path, 'masks', filename.stem + '_zones.png'), as_gray=True))
+        if Path(val_path, 'masks', filename.stem + '_zones.png').exists():
+            gt_imgs.append(io.imread(Path(val_path, 'masks', filename.stem + '_zones.png'), as_gray=True))
+        else:
+            gt_imgs.append(io.imread(Path(val_path, 'masks', filename.stem + '.png'), as_gray=True))
         if (Path(tmp_dir, filename.stem + '_pred.png')).exists():
             pred_img = io.imread(Path(tmp_dir, filename.stem + '_pred.png'), as_gray=True)
         elif Path(tmp_dir,filename.name).exists():
@@ -152,7 +158,7 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, p
     plt.xlabel('Cutoff Point')
     plt.savefig(str(Path(out_path, 'cutoff.png')), bbox_inches='tight', format='png', dpi=200)
 
-    #shutil.rmtree(tmp_dir, ignore_errors=True)
+    shutil.rmtree(tmp_dir, ignore_errors=True)
 
     return max_cutoff
 
@@ -162,25 +168,21 @@ def predict_patches_only(model, img_path, out_path, batch_size=16, patch_size=25
 
     if not Path(out_path, 'images').exists():
         Path(out_path, 'images').mkdir()
-    if not Path(out_path, 'masks').exists():
-        Path(out_path, 'masks').mkdir()
-    if not Path(out_path, 'uncertainty').exists():
-        Path(out_path, 'uncertainty').mkdir()
+    #if not Path(out_path, 'masks').exists():
+    #    Path(out_path, 'masks').mkdir()
+    #if not Path(out_path, 'uncertainty').exists():
+    #    Path(out_path, 'uncertainty').mkdir()
 
     patches = []
+    index = []
     for filename in Path(img_path).rglob('*.png'):
         #print(filename)
         img = io.imread(filename, as_gray=True)
         if preprocessor is not None:
             img = preprocessor.process(img)
         img = img / 255
-        if img.shape != (patch_size,patch_size):
-            img_pad = cv2.copyMakeBorder(img, 0, (patch_size - img.shape[0]) % patch_size, 0, (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
-            p_img, i_img = extract_grayscale_patches(img_pad, (patch_size, patch_size), stride = (patch_size, patch_size))
-            patches += list(p_img)
-        else:
-            patches.append(img)
-
+        patches.append(img)
+        index.append(filename.stem)
     for b_index in range((len(patches) // batch_size) +1):
         if (b_index+1 * batch_size < len(patches)):
             batch = np.array(patches[b_index * batch_size:(b_index+1)*batch_size])
@@ -203,7 +205,7 @@ def predict_patches_only(model, img_path, out_path, batch_size=16, patch_size=25
         i = b_index * batch_size
         for patch, mask_predicted, uncertainty in zip(batch, patches_predicted, patches_uncertainty):
             patch = 255 * patch
-            io.imsave(Path(out_path, 'images', str(i) + '.png'), patch.astype(np.uint8))
+            io.imsave(Path(out_path, index[i] + '.png'), patch.astype(np.uint8))
 
 
             if cutoff is not None:
@@ -213,10 +215,10 @@ def predict_patches_only(model, img_path, out_path, batch_size=16, patch_size=25
             else:
                 mask_predicted = 255 * mask_predicted
 
-            io.imsave(Path(out_path, 'masks', str(i) + '.png'), mask_predicted.astype(np.uint8))
+            io.imsave(Path(out_path, index[i] + '_pred.png'), mask_predicted.astype(np.uint8))
 
             uncertainty_img = (65535 * uncertainty).astype(np.uint16)
-            io.imsave(Path(out_path, 'uncertainty', str(i) + '.png'), uncertainty_img, check_contrast=False )
+            io.imsave(Path(out_path, index[i] + '_uncertainty.png'), uncertainty_img, check_contrast=False )
 
             i += 1
 
@@ -229,6 +231,7 @@ if __name__ == '__main__':
     parser.add_argument('--gt_path', type=str, help='Path containing the ground truth, necessary for evaluation_scripts')
     parser.add_argument('--batch_size', default=1, type=int, help='batch size (integer value)')
     parser.add_argument('--cutoff', type=float, help='cutoff point of binarisation')
+    parser.add_argument('--patches_only', type=int, default=0)
     args = parser.parse_args()
 
     model_path = Path(args.model_path)
@@ -270,7 +273,10 @@ if __name__ == '__main__':
 
     if 'bayes' in model_name:
         print("Bayes")
-        predict_bayes(model, args.img_path, out_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
+        if args.patches_only:
+            predict_patches_only(model, args.img_path, out_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
+        else:
+            predict_bayes(model, args.img_path, out_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
     else:
         predict(model, args.img_path, out_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
 
