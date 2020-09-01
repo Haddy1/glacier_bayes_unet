@@ -104,9 +104,8 @@ def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cuto
         #np.save(Path(out_path, filename.stem + '_uncertainty.npy'), uncertainty)
 
 
-def get_cutoff_point(model, val_set, out_path=None, batch_size = 16, cutoff_pts=np.arange(0.2, 0.8, 0.025), mc_iterations=None):
+def get_cutoff_point(model, img_set, mask_set, out_path=None, batch_size = 16, cutoff_pts=np.arange(0.2, 0.8, 0.025), mc_iterations=None):
     dice_all = []
-    img_set, mask_set = val_set
     results = model.predict(img_set, batch_size = batch_size)
     if mc_iterations:
         for iter in range(1,mc_iterations):
