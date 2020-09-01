@@ -7,8 +7,8 @@ import json
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger
-from tensorflow.keras.models import load_model
+from keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger
+from keras.models import load_model
 import os
 from CLR.clr_callback import CyclicLR
 from layers.BayesDropout import  BayesDropout
@@ -17,7 +17,7 @@ from utils.data import trainGenerator
 import models
 from utils import helper_functions
 from loss_functions import *
-from tensorflow.keras.losses import *
+from keras.losses import *
 from shutil import copy, rmtree
 from preprocessing.preprocessor import Preprocessor
 from preprocessing import data_generator, filter

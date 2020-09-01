@@ -1,5 +1,5 @@
-from tensorflow.keras import backend as K
-from tensorflow.keras.losses import *
+from keras import backend as K
+from keras.losses import *
 import tensorflow as tf
 from scipy.spatial.distance import dice
 

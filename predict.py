@@ -6,7 +6,7 @@ from tensorflow.keras.models import load_model
 import pickle
 import argparse
 from loss_functions import *
-from tensorflow.keras.losses import binary_crossentropy
+from keras.losses import binary_crossentropy
 from layers.BayesDropout import  BayesDropout
 from preprocessing.preprocessor import Preprocessor
 from preprocessing import filter
