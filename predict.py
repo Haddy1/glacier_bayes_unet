@@ -106,8 +106,8 @@ def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cuto
 
 def get_cutoff_point(model, img_set, mask_set, n_images, out_path=None, batch_size = 16, cutoff_pts=np.arange(0.2, 0.8, 0.025), mc_iterations=None):
     dice_all = []
-    results = model.predict(img_set)
     print(n_images)
+    results = model.predict(img_set)
     if mc_iterations:
         for iter in range(1,mc_iterations):
             iter_results = model.predict(img_set)
@@ -121,6 +121,7 @@ def get_cutoff_point(model, img_set, mask_set, n_images, out_path=None, batch_si
         for gt, pred in zip(mask_set, results):
             pred_img = (pred > cutoff).astype(int)
             dice.append(dice_coefficient(gt, pred_img))
+        print(np.mean(dice))
         dice_all.append(np.mean(dice))
 
     cutoff_pts_list = np.array(cutoff_pts)
@@ -135,8 +136,8 @@ def get_cutoff_point(model, img_set, mask_set, n_images, out_path=None, batch_si
         plt.rcParams.update({'font.size': 18})
         plt.figure()
         plt.plot((cutoff_pt, cutoff_pt),(0, max_dice), linestyle=':', linewidth=2, color='grey')
-        plt.plot(cutoff_pts_list, dice)
-        plt.annotate(f'{max_dice:.2f}', (cutoff_pts_list, max_dice), fontsize='x-small')
+        plt.plot(cutoff_pts_list, dice_all)
+        plt.annotate(f'{max_dice:.2f}', (cutoff_pt, max_dice), fontsize='x-small')
         plt.ylabel('Dice')
         plt.xlabel('Cutoff Point')
         plt.savefig(str(Path(out_path, 'cutoff.png')), bbox_inches='tight', format='png', dpi=200)
