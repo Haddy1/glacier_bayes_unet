@@ -2,11 +2,11 @@ import sys
 import json
 import seaborn as sns
 from pathlib import Path
-from keras.models import load_model
+from tensorflow.keras.models import load_model
 import pickle
 import argparse
 from loss_functions import *
-from keras.losses import binary_crossentropy
+from tensorflow.keras.losses import binary_crossentropy
 from layers.BayesDropout import  BayesDropout
 from preprocessing.preprocessor import Preprocessor
 from preprocessing import filter
@@ -104,12 +104,13 @@ def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cuto
         #np.save(Path(out_path, filename.stem + '_uncertainty.npy'), uncertainty)
 
 
-def get_cutoff_point(model, img_set, mask_set, out_path=None, batch_size = 16, cutoff_pts=np.arange(0.2, 0.8, 0.025), mc_iterations=None):
+def get_cutoff_point(model, img_set, mask_set, n_images, out_path=None, batch_size = 16, cutoff_pts=np.arange(0.2, 0.8, 0.025), mc_iterations=None):
     dice_all = []
-    results = model.predict(img_set, batch_size = batch_size)
+    results = model.predict(img_set)
+    print(n_images)
     if mc_iterations:
         for iter in range(1,mc_iterations):
-            iter_results = model.predict(img_set, batch_size = batch_size)
+            iter_results = model.predict(img_set)
             for i in range(len(results)):
                 results[i] += iter_results[i]
         for i in range(len(results)):

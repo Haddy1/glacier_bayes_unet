@@ -1,5 +1,5 @@
 from __future__ import print_function
-from keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import numpy as np 
 import os
 import glob
@@ -74,7 +74,7 @@ def imgGenerator(batch_size,train_path,image_folder,aug_dict=None,image_color_mo
                        mask_color_mode = "grayscale",image_save_prefix  = "image",mask_save_prefix  = "mask",
                        flag_multi_class = False,num_class = 2,save_to_dir = None,target_size = (256,256),seed = 1):
     if aug_dict == None:
-        image_datagen = ImageDataGenerator()
+        image_datagen = ImageDataGenerator(preprocessing_function=lambda img: img /255)
     else:
         image_datagen = ImageDataGenerator(**aug_dict)
 
@@ -88,10 +88,7 @@ def imgGenerator(batch_size,train_path,image_folder,aug_dict=None,image_color_mo
         save_to_dir = save_to_dir,
         save_prefix  = image_save_prefix,
         seed = seed)
-    for img in image_generator:
-        if(np.max(img) > 1):
-            img = img / 255
-        yield img
+    return image_generator
 
 
 

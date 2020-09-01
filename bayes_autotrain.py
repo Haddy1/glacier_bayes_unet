@@ -10,13 +10,13 @@ from shutil import copy, rmtree
 from layers.BayesDropout import  BayesDropout
 from predict import predict_patches_only, predict_bayes
 from loss_functions import *
-from keras.losses import binary_crossentropy
-from keras.models import load_model
+from tensorflow.keras.losses import binary_crossentropy
+from tensorflow.keras.models import load_model
 import json
 import pickle
 from utils.evaluate import evaluate
 from train import train
-from keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger
 
 
 parser = argparse.ArgumentParser(description='Glacier Front Segmentation')
