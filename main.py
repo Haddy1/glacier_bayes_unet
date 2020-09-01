@@ -59,6 +59,7 @@ if __name__ == '__main__':
     parser.add_argument('--learning_rate', type=float, default=1e-4, help='Initial learning rate')
     parser.add_argument('--predict', type=int, default=1, help='Evaluate prediction')
     parser.add_argument('--evaluate', type=int, default=1, help='Evaluate prediction')
+    parser.add_argument('--mc_iterations', type=int, default=20, help='Nr Monte Carlo Iterations for Bayes model')
     # parser.add_argument('--Random_Seed', default=1, type=int, help='random seed number value (any integer value)')
 
     args = parser.parse_args()
@@ -231,25 +232,25 @@ if __name__ == '__main__':
         if Path(out_path, 'patches').exists():
             rmtree(Path(out_path, 'patches'))
 
-    if args.image_patches and not Path(data_path, 'val/patches').exists():
-        print('Cannot optimize cutoff point since only patches of the validation images exist')
-        cutoff = 0.5
+    print("Finding optimal cutoff point")
+    if 'bayes' in model.name:
+        cutoff = get_cutoff_point(model, val_Generator, out_path=out_path, batch_size=batch_size, mc_iterations=args.mc_iterations)
     else:
-        print("Finding optimal cutoff point")
-        cutoff = get_cutoff_point(model, Path(data_path, 'val'), out_path, batch_size=batch_size, patch_size=patch_size, preprocessor=preprocessor)
-        # resave arguments including cutoff point
-        with open(Path(out_path, 'options.json'), 'w') as f:
-            args.__dict__['cutoff'] = cutoff
-            f.write(json.dumps(vars(args)))
+        cutoff = get_cutoff_point(model, val_Generator, out_path=out_path, batch_size=batch_size)
+
+    # resave arguments including cutoff point
+    with open(Path(out_path, 'options.json'), 'w') as f:
+        args.__dict__['cutoff'] = cutoff
+        f.write(json.dumps(vars(args)))
 
     if args.predict:
         test_path = str(Path(data_path, 'test'))
         if 'bayes' in model.name:
-            predict_bayes(model, Path(test_path, 'images'), out_path, batch_size=batch_size, patch_size=patch_size, preprocessor=preprocessor, cutoff=cutoff)
+            predict_bayes(model, Path(test_path, 'images'), out_path, batch_size=batch_size, patch_size=patch_size, preprocessor=preprocessor, cutoff=cutoff, mc_iterations=args.mc_iterations)
         else:
             predict(model, Path(test_path, 'images'), out_path, batch_size=batch_size, patch_size=patch_size, preprocessor=preprocessor, cutoff=cutoff)
         if args.evaluate:
-            evaluate.evaluate(Path(test_path, 'images'), Path(test_path, 'masks'), out_path)
+            evaluate.evaluate(Path(test_path, 'masks'), out_path)
 
     END = time.time()
     print('Execution Time: ', END - START)

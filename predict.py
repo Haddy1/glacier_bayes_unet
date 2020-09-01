@@ -13,9 +13,11 @@ from preprocessing import filter
 import numpy as np
 import skimage.io as io
 import cv2
-from utils.evaluate import evaluate, evaluate_dice_only
+from utils.metrics import dice_coefficient
+from utils.evaluate import evaluate#, evaluate_dice_only
 from preprocessing.image_patches import extract_grayscale_patches, reconstruct_from_grayscale_patches
 import matplotlib.pyplot as plt
+import pandas as pd
 import shutil
 
 def predict(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None):
@@ -102,65 +104,111 @@ def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cuto
         #np.save(Path(out_path, filename.stem + '_uncertainty.npy'), uncertainty)
 
 
-def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, preprocessor=None):
-    tmp_dir = Path(out_path, 'cutoff_tmp', patches_only=False)
+def get_cutoff_point(model, val_set, out_path=None, batch_size = 16, cutoff_pts=np.arange(0.2, 0.8, 0.025), mc_iterations=None):
+    dice_all = []
+    img_set, mask_set = val_set
+    results = model.predict(img_set, batch_size = batch_size)
+    if mc_iterations:
+        for iter in range(1,mc_iterations):
+            iter_results = model.predict(img_set, batch_size = batch_size)
+            for i in range(len(results)):
+                results[i] += iter_results[i]
+        for i in range(len(results)):
+            results[i] /= mc_iterations
 
-    if 'bayes' in model.name:
-        if patches_only:
-            predict_patches_only(model, args.img_path, out_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
-        else:
-            predict_bayes(model, Path(val_path, 'images'), tmp_dir, batch_size=batch_size,
-                    patch_size=patch_size, preprocessor=preprocessor, cutoff=None)
-    else:
-        predict(model, Path(val_path, 'images'), tmp_dir, batch_size=batch_size,
-                patch_size=patch_size, preprocessor=preprocessor, cutoff=None)
+    for cutoff in cutoff_pts:
+        dice = []
+        for gt, pred in zip(mask_set, results):
+            pred_img = (pred > cutoff).astype(int)
+            dice.append(dice_coefficient(gt, pred_img))
+        dice_all.append(np.mean(dice))
 
-    # Read images into memory
-    imgs = []
-    gt_imgs = []
-    pred_imgs = []
-    for filename in Path(val_path, 'images').glob('*.png'):
-        imgs.append(io.imread(filename, as_gray=True))
+    cutoff_pts_list = np.array(cutoff_pts)
+    dice_all = np.array(dice_all)
+    argmax = np.argmax(dice_all)
+    cutoff_pt = cutoff_pts_list[argmax]
+    max_dice = dice_all[argmax]
+    if out_path:
+        df = pd.DataFrame({'cutoff_pts':cutoff_pts_list, 'dice': dice_all})
+        df.to_pickle(Path(out_path, 'dice_cutoff.pkl')) # Save all values for later plot changes
 
-        if Path(val_path, 'masks', filename.stem + '_zones.png').exists():
-            gt_imgs.append(io.imread(Path(val_path, 'masks', filename.stem + '_zones.png'), as_gray=True))
-        else:
-            gt_imgs.append(io.imread(Path(val_path, 'masks', filename.stem + '.png'), as_gray=True))
-        if (Path(tmp_dir, filename.stem + '_pred.png')).exists():
-            pred_img = io.imread(Path(tmp_dir, filename.stem + '_pred.png'), as_gray=True)
-        elif Path(tmp_dir,filename.name).exists():
-            pred_img = io.imread(Path(tmp_dir,filename.name), as_gray=True) # Legacy before predictions got pred indentifier
-        pred_img = pred_img / 255
-        pred_imgs.append(pred_img)
+        plt.rcParams.update({'font.size': 18})
+        plt.figure()
+        plt.plot((cutoff_pt, cutoff_pt),(0, max_dice), linestyle=':', linewidth=2, color='grey')
+        plt.plot(cutoff_pts_list, dice)
+        plt.annotate(f'{max_dice:.2f}', (cutoff_pts_list, max_dice), fontsize='x-small')
+        plt.ylabel('Dice')
+        plt.xlabel('Cutoff Point')
+        plt.savefig(str(Path(out_path, 'cutoff.png')), bbox_inches='tight', format='png', dpi=200)
 
-    # Try different cutoff points
-    dice = []
-    cutoff_range = np.arange(0.3, 0.725, 0.025)
+    return cutoff_pt
 
-    for cutoff in cutoff_range:
-        pred_bin = [pred >= cutoff for pred in pred_imgs]
-        dice_mean = np.mean(evaluate_dice_only(imgs, gt_imgs, pred_bin))
-        dice.append(dice_mean)
 
-    dice = np.array(dice)
-    argmax = np.argmax(dice)
 
-    np.save(Path(out_path, 'dice_cutoff.npy'), dice)  # Save all values for later plot changes
-    max_dice = dice[argmax]
-    max_cutoff = cutoff_range[argmax]
 
-    plt.rcParams.update({'font.size': 18})
-    plt.figure()
-    plt.plot((max_cutoff, max_cutoff),(0, max_dice), linestyle=':', linewidth=2, color='grey')
-    plt.plot(cutoff_range, dice)
-    plt.annotate(f'{max_dice:.2f}', (max_cutoff, max_dice), fontsize='x-small')
-    plt.ylabel('Dice')
-    plt.xlabel('Cutoff Point')
-    plt.savefig(str(Path(out_path, 'cutoff.png')), bbox_inches='tight', format='png', dpi=200)
 
-    shutil.rmtree(tmp_dir, ignore_errors=True)
 
-    return max_cutoff
+
+
+#def get_cutoff_point_(model, val_path, out_path, batch_size=16, patch_size=256, preprocessor=None):
+#    tmp_dir = Path(out_path, 'cutoff_tmp', patches_only=False)
+#
+#    if 'bayes' in model.name:
+#        if patches_only:
+#            predict_patches_only(model, args.img_path, out_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
+#        else:
+#            predict_bayes(model, Path(val_path, 'images'), tmp_dir, batch_size=batch_size,
+#                    patch_size=patch_size, preprocessor=preprocessor, cutoff=None)
+#    else:
+#        predict(model, Path(val_path, 'images'), tmp_dir, batch_size=batch_size,
+#                patch_size=patch_size, preprocessor=preprocessor, cutoff=None)
+#
+#    # Read images into memory
+#    imgs = []
+#    gt_imgs = []
+#    pred_imgs = []
+#    for filename in Path(val_path, 'images').glob('*.png'):
+#        imgs.append(io.imread(filename, as_gray=True))
+#
+#        if Path(val_path, 'masks', filename.stem + '_zones.png').exists():
+#            gt_imgs.append(io.imread(Path(val_path, 'masks', filename.stem + '_zones.png'), as_gray=True))
+#        else:
+#            gt_imgs.append(io.imread(Path(val_path, 'masks', filename.stem + '.png'), as_gray=True))
+#        if (Path(tmp_dir, filename.stem + '_pred.png')).exists():
+#            pred_img = io.imread(Path(tmp_dir, filename.stem + '_pred.png'), as_gray=True)
+#        elif Path(tmp_dir,filename.name).exists():
+#            pred_img = io.imread(Path(tmp_dir,filename.name), as_gray=True) # Legacy before predictions got pred indentifier
+#        pred_img = pred_img / 255
+#        pred_imgs.append(pred_img)
+#
+#    # Try different cutoff points
+#    dice = []
+#    cutoff_range = np.arange(0.3, 0.725, 0.025)
+#
+#    for cutoff in cutoff_range:
+#        pred_bin = [pred >= cutoff for pred in pred_imgs]
+#        dice_mean = np.mean(evaluate_dice_only(imgs, gt_imgs, pred_bin))
+#        dice.append(dice_mean)
+#
+#    dice = np.array(dice)
+#    argmax = np.argmax(dice)
+#
+#    np.save(Path(out_path, 'dice_cutoff.npy'), dice)  # Save all values for later plot changes
+#    max_dice = dice[argmax]
+#    max_cutoff = cutoff_range[argmax]
+#
+#    plt.rcParams.update({'font.size': 18})
+#    plt.figure()
+#    plt.plot((max_cutoff, max_cutoff),(0, max_dice), linestyle=':', linewidth=2, color='grey')
+#    plt.plot(cutoff_range, dice)
+#    plt.annotate(f'{max_dice:.2f}', (max_cutoff, max_dice), fontsize='x-small')
+#    plt.ylabel('Dice')
+#    plt.xlabel('Cutoff Point')
+#    plt.savefig(str(Path(out_path, 'cutoff.png')), bbox_inches='tight', format='png', dpi=200)
+#
+#    shutil.rmtree(tmp_dir, ignore_errors=True)
+#
+#    return max_cutoff
 
 def predict_patches_only(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 20, uncertainty_threshold=1e-3):
     if not Path(out_path).exists():
@@ -281,5 +329,5 @@ if __name__ == '__main__':
         predict(model, args.img_path, out_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
 
     if args.gt_path:
-        evaluate(args.img_path, args.gt_path, out_path)
+        evaluate(args.gt_path, out_path)
 

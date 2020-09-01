@@ -14,8 +14,8 @@ import os
 os.chdir('../')
 plt.rcParams.update({'font.size': 18})
 
-identifier = 'Jakobshavn'
-path = Path('/home/andreas/glacier-front-detection/output_pix2pix/' + identifier)
+identifier = 'output_Jakobshavn_pix2pix_wasserstein'
+path = Path('/home/andreas/glacier-front-detection/output_pix2pix_/' + identifier)
 out = Path('/home/andreas/thesis/reports/pix2pix')
 if not out.exists():
     out.mkdir(parents=True)
@@ -25,14 +25,14 @@ if not Path(out, 'imgs').exists():
 #imgs = ['2009-08-04_TSX_6_1', '2014-07-25_TSX_6_1']
 imgs = ['0', '66', '90', '95', '111', '743']
 #for i in ['2006-02-23_RSAT_20_3', '1993-08-29_ERS_20_5', '2011-09-21_TDX_5_1']:
-#for i in imgs:
-#    copy(Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_front_only/test/images/', i + '.png'), Path(out, 'imgs', i + '.png'))
-#    copy(Path(path, i + '_pred.png'), Path(out, 'imgs', identifier + "_" + i + '_pred.png'))
-#    #copy(Path(path, i + '_diff.png'), Path(out, 'imgs', i + '_diff.png'))
-#
-#    uncert = io.imread(Path(path, i + '_uncertainty.png'), as_gray=True) / 65535
-#    uncert_norm = (uncert / uncert.max()) * 255
-#    io.imsave(Path(out, 'imgs', identifier + "_" + i + '_uncert.png'), uncert_norm)
+for i in imgs:
+    copy(Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_front_only/test/patches/images/', i + '.png'), Path(out, 'imgs', i + '.png'))
+    copy(Path(path, i + '-_pred.png'), Path(out, 'imgs', identifier + "_" + i + '_pred.png'))
+    #copy(Path(path, i + '_diff.png'), Path(out, 'imgs', i + '_diff.png'))
+
+    uncert = io.imread(Path(path, i + '-_uncertainty.png'), as_gray=True) / 65535
+    uncert_norm = (uncert / uncert.max()) * 255
+    io.imsave(Path(out, 'imgs', identifier + "_" + i + '_uncert.png'), uncert_norm)
 
 
 
@@ -68,6 +68,8 @@ with open(Path(out,'results_' +identifier + '.tex'), 'w') as f:
             continue
         if column == 'euclidian':
             line += ' & ' + str(round(scores[column].mean(),2)) + ' (\\pm ' + str(round(scores[column].std(), 2)) + ')'
+        elif column == 'uncertainty':
+            line += ' & ' + str(round(scores[column].mean().mean(),2)) #+ ' (\\pm ' + str(round(scores[column].std(), 2)) + ')'
         else:
             line += ' & ' + fperc(scores[column].mean()) + ' (\\pm ' + fperc(scores[column].std()) + ')'
     line += " \\\\\n"
@@ -81,7 +83,10 @@ with open(Path(out,'results_' +identifier + '.tex'), 'w') as f:
                 continue
             if column == 'euclidian':
                 line += ' & ' + str(round(float(row[column]),2))
+            elif column == 'uncertainty':
+                line += ' & ' + fperc(float(row[column].mean().mean()))
             else:
+                entry = row[column]
                 line += ' & ' + fperc(float(row[column]))
         line += " \\\\\n"
         f.write(line)
@@ -125,42 +130,42 @@ plt.show()
 #plt.show()
 
 #%%
-plt.rcParams['axes.formatter.limits'] = (-3, 3)
-fig = plt.figure()
-ax = sns.regplot(x='uncertainty', y='dice', data=scores)
-ax.set_xlim((0,scores['uncertainty'].max()))
-plt.xlabel("Uncertainty")
-plt.ylabel("Dice Coefficient")
-plt.savefig(str(Path(out, 'imgs', 'uncert_corr_' + identifier + '.png')), bbox_inches='tight', format='png', dpi=200)
-plt.show()
-
-plt.figure()
-bins =  np.linspace(0,5e-3, 11)
-#scores_bayes['bins'] = pd.qcut(scores_bayes['uncertainty'], q=10)
-dice_bins = []
-for i in range(len(bins)-1):
-    dice_bins.append(scores['dice'][(scores['uncertainty'] >= bins[i]) & (scores['uncertainty'] < bins[i+1])])
-
-data = {}
-data['bins'] = bins[:-1]
-data['dice'] = dice_bins
-df = pd.DataFrame.from_dict(data)
-
-plt.rcParams.update({'font.size': 14})
-#ax = sns.boxplot(data=scores_bayes, y='dice', x='bins')
-ax = sns.boxplot(data=dice_bins)
-sns.swarmplot(data=dice_bins, color=".25")
-
-bins_str = ["{:.1f}".format(1e3 * bin) for bin in list(bins)]
-plt.xticks(np.arange(0,11)-0.5, bins_str, horizontalalignment='right')
-ax.xaxis.grid(True)
-plt.xlabel("Uncertainty")
-plt.ylabel("Dice Coefficient")
-
-plt.gca().get_xaxis().get_major_formatter().set_offset_string('$10^{-3}$')
-#ax.xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
-plt.savefig(str(Path(out, 'imgs', 'uncert_dist_' + identifier + '.png')), bbox_inches='tight', format='png', dpi=200)
-
-plt.show()
+#plt.rcParams['axes.formatter.limits'] = (-3, 3)
+#fig = plt.figure()
+#ax = sns.regplot(x='uncertainty', y='dice', data=scores)
+#ax.set_xlim((0,scores['uncertainty'].max()))
+#plt.xlabel("Uncertainty")
+#plt.ylabel("Dice Coefficient")
+#plt.savefig(str(Path(out, 'imgs', 'uncert_corr_' + identifier + '.png')), bbox_inches='tight', format='png', dpi=200)
+#plt.show()
+#
+#plt.figure()
+#bins =  np.linspace(0,5e-3, 11)
+##scores_bayes['bins'] = pd.qcut(scores_bayes['uncertainty'], q=10)
+#dice_bins = []
+#for i in range(len(bins)-1):
+#    dice_bins.append(scores['dice'][(scores['uncertainty'] >= bins[i]) & (scores['uncertainty'] < bins[i+1])])
+#
+#data = {}
+#data['bins'] = bins[:-1]
+#data['dice'] = dice_bins
+#df = pd.DataFrame.from_dict(data)
+#
+#plt.rcParams.update({'font.size': 14})
+##ax = sns.boxplot(data=scores_bayes, y='dice', x='bins')
+#ax = sns.boxplot(data=dice_bins)
+#sns.swarmplot(data=dice_bins, color=".25")
+#
+#bins_str = ["{:.1f}".format(1e3 * bin) for bin in list(bins)]
+#plt.xticks(np.arange(0,11)-0.5, bins_str, horizontalalignment='right')
+#ax.xaxis.grid(True)
+#plt.xlabel("Uncertainty")
+#plt.ylabel("Dice Coefficient")
+#
+#plt.gca().get_xaxis().get_major_formatter().set_offset_string('$10^{-3}$')
+##ax.xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+#plt.savefig(str(Path(out, 'imgs', 'uncert_dist_' + identifier + '.png')), bbox_inches='tight', format='png', dpi=200)
+#
+#plt.show()
 
 

@@ -108,7 +108,7 @@ for iter in range(args.max_iterations):
     if args.test_path and Path(args.test_path).exists():
         test_path = Path(args.test_path)
         predict_bayes(model, Path(test_path, 'images'), Path(new_iter_path, 'eval'), batch_size=batch_size, patch_size=patch_size, cutoff=cutoff)
-        evaluate(Path(test_path, 'images'), Path(test_path, 'masks'), Path(new_iter_path, 'eval'))
+        evaluate(Path(test_path, 'masks'), Path(new_iter_path, 'eval'))
     img_path = Path(iter_path, 'unlabeled')
     iter_path = new_iter_path
 
