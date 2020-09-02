@@ -1,9 +1,5 @@
 #import keras.backend as K
-from tensorflow.python.keras import backend as K
-from keras.layers import Layer, Dropout
-from tensorflow.python.keras.utils import tf_utils
-from tensorflow.python.ops import array_ops
-from tensorflow.python.framework import ops
+from tensorflow.keras.layers import Layer, Dropout
 from tensorflow.python.ops import nn
 
 

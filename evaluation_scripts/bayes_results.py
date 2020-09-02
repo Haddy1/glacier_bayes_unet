@@ -14,8 +14,8 @@ import os
 os.chdir('../')
 plt.rcParams.update({'font.size': 18})
 
-identifier = 'output_Jakobshavn_pix2pix_wasserstein'
-path = Path('/home/andreas/glacier-front-detection/output_pix2pix_/' + identifier)
+identifier = 'Jakobshavn_front_only'
+path = Path('/home/andreas/glacier-front-detection/output_pix2pix_front_only/' + identifier)
 out = Path('/home/andreas/thesis/reports/pix2pix')
 if not out.exists():
     out.mkdir(parents=True)
@@ -24,15 +24,16 @@ if not Path(out, 'imgs').exists():
 
 #imgs = ['2009-08-04_TSX_6_1', '2014-07-25_TSX_6_1']
 imgs = ['0', '66', '90', '95', '111', '743']
+imgs_new = ['667', '354', '109', '92', '297', '8']
 #for i in ['2006-02-23_RSAT_20_3', '1993-08-29_ERS_20_5', '2011-09-21_TDX_5_1']:
-for i in imgs:
-    copy(Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_front_only/test/patches/images/', i + '.png'), Path(out, 'imgs', i + '.png'))
-    copy(Path(path, i + '-_pred.png'), Path(out, 'imgs', identifier + "_" + i + '_pred.png'))
+for i in range(len(imgs)):
+    copy(Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_front_only/test/patches/images/', imgs_new[i] + '.png'), Path(out, 'imgs', imgs[i] + '.png'))
+    copy(Path(path, imgs_new[i] + '_pred.png'), Path(out, 'imgs', identifier + "_" + imgs[i] + '_pred.png'))
     #copy(Path(path, i + '_diff.png'), Path(out, 'imgs', i + '_diff.png'))
 
-    uncert = io.imread(Path(path, i + '-_uncertainty.png'), as_gray=True) / 65535
+    uncert = io.imread(Path(path, imgs_new[i] + '_uncertainty.png'), as_gray=True) / 65535
     uncert_norm = (uncert / uncert.max()) * 255
-    io.imsave(Path(out, 'imgs', identifier + "_" + i + '_uncert.png'), uncert_norm)
+    io.imsave(Path(out, 'imgs', identifier + "_" + imgs[i] + '_uncert.png'), uncert_norm)
 
 
 

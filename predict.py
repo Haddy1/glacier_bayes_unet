@@ -2,7 +2,7 @@ import sys
 import json
 import seaborn as sns
 from pathlib import Path
-from tensorflow.keras.models import load_model
+from keras.models import load_model
 import pickle
 import argparse
 from loss_functions import *
@@ -211,12 +211,13 @@ def get_cutoff_point(model, img_set, mask_set, n_images, out_path=None, batch_si
 #
 #    return max_cutoff
 
+
 def predict_patches_only(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 20, uncertainty_threshold=1e-3):
     if not Path(out_path).exists():
         Path(out_path).mkdir(parents=True)
 
-    if not Path(out_path, 'images').exists():
-        Path(out_path, 'images').mkdir()
+    #if not Path(out_path, 'images').exists():
+    #    Path(out_path, 'images').mkdir()
     #if not Path(out_path, 'masks').exists():
     #    Path(out_path, 'masks').mkdir()
     #if not Path(out_path, 'uncertainty').exists():
@@ -270,6 +271,8 @@ def predict_patches_only(model, img_path, out_path, batch_size=16, patch_size=25
             io.imsave(Path(out_path, index[i] + '_uncertainty.png'), uncertainty_img, check_contrast=False )
 
             i += 1
+
+
 
 
 if __name__ == '__main__':
