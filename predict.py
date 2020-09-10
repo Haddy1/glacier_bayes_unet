@@ -5,7 +5,6 @@ from pathlib import Path
 from tensorflow.keras.models import load_model
 from utils.data import *
 import tensorflow as tf
-import tensorflow_datasets as tfds
 import pickle
 import argparse
 from loss_functions import *
@@ -116,67 +115,6 @@ def eval_dice(gt, pred, cutoff):
     dice.append(dice_coefficient_tf(gt, pred_bin))
 
 
-#def get_cutoff_point(model, val_path, out_path, batch_size = 16, patch_size=256, cutoff_pts=np.arange(0.2, 0.8, 0.025), mc_iterations=None):
-#    tmp_path = Path(out_path, 'cutoff_tmp')
-#    process_data(val_path, tmp_path, patch_size=patch_size)
-#    img_generator = imgGenerator(batch_size, val_patch_path, 'images', target_size=(patch_size, patch_size), shuffle=False)
-#    mask_files = []
-#    for f in img_generator.filenames:
-#        basename  = Path(f).stem
-#        if Path(val_patch_path, 'masks', basename + '_zones.png').exists():
-#            mask_files.append(Path(val_patch_path, 'masks', basename + '_zones.png'))
-#        else:
-#            mask_files.append(Path(val_patch_path, 'masks', basename + '.png'))
-#    results = model.predict(img_generator)
-#    if mc_iterations:
-#        for iter in range(1,mc_iterations):
-#            results += model.predict(img_generator)
-#        results /= mc_iterations
-#
-#    dice_all = []
-#    for cutoff in cutoff_pts:
-#        dice = []
-#        p = Pool()
-#        idx = 0
-#        while idx < len(results):
-#            batch = []
-#            for idx in range(idx, idx + batch_size):
-#                if idx < len(results):
-#                    pred_img  = (results[idx] > cutoff).astype(int)
-#                    gt_img = io.imread(mask_files[idx])
-#                    gt = (gt_img >= 200).astype(int)
-#                    batch.append((gt.flatten(), pred_img.flatten()))
-#
-#            idx +=1
-#            dice += p.starmap(dice_coefficient, batch)
-#
-#
-#        print(np.mean(dice))
-#        dice_all.append(np.mean(dice))
-#
-#    cutoff_pts_list = np.array(cutoff_pts)
-#    print(dice_all)
-#    dice_all = np.array(dice_all)
-#    argmax = np.argmax(dice_all)
-#    cutoff_pt = cutoff_pts_list[argmax]
-#    max_dice = dice_all[argmax]
-#    if False:
-#        df = pd.DataFrame({'cutoff_pts':cutoff_pts_list, 'dice': dice_all})
-#        df.to_pickle(Path(out_path, 'dice_cutoff.pkl')) # Save all values for later plot changes
-#
-#        plt.rcParams.update({'font.size': 18})
-#        plt.figure()
-#        plt.plot((cutoff_pt, cutoff_pt),(0, max_dice), linestyle=':', linewidth=2, color='grey')
-#        plt.plot(cutoff_pts_list, dice_all)
-#        plt.annotate(f'{max_dice:.2f}', (cutoff_pt, max_dice), fontsize='x-small')
-#        plt.ylabel('Dice')
-#        plt.xlabel('Cutoff Point')
-#        plt.savefig(str(Path(out_path, 'cutoff.png')), bbox_inches='tight', format='png', dpi=200)
-#
-#    return cutoff_pt
-
-
-
 def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, cutoff_pts=np.arange(0.2, 0.8, 0.025), preprocessor=None, mc_iterations=20):
     tmp_dir = Path(out_path, 'cutoff_tmp', patches_only=False)
 
@@ -250,13 +188,6 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, c
 def predict_patches_only(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 20, uncertainty_threshold=1e-3):
     if not Path(out_path).exists():
         Path(out_path).mkdir(parents=True)
-
-    #if not Path(out_path, 'images').exists():
-    #    Path(out_path, 'images').mkdir()
-    #if not Path(out_path, 'masks').exists():
-    #    Path(out_path, 'masks').mkdir()
-    #if not Path(out_path, 'uncertainty').exists():
-    #    Path(out_path, 'uncertainty').mkdir()
 
     patches = []
     index = []
