@@ -3,15 +3,16 @@ import os
 import skimage.io as io
 import skimage.transform as trans
 import numpy as np
-from keras.models import *
-from keras.layers import *
-from keras.backend import learning_phase
-from keras.optimizers import *
-from keras.losses import *
+import tensorflow.keras as keras
+from tensorflow.keras.models import *
+from tensorflow.keras.layers import *
+from tensorflow.keras.backend import learning_phase
+from tensorflow.keras.optimizers import *
+from tensorflow.keras.losses import *
 from layers.BayesDropout import BayesDropout
-from keras.callbacks import ModelCheckpoint, LearningRateScheduler
-from keras import backend as K
-from keras.layers import LeakyReLU
+from tensorflow.keras.callbacks import ModelCheckpoint, LearningRateScheduler
+from tensorflow.keras import backend as K
+from tensorflow.keras.layers import LeakyReLU
 
 def unet(pretrained_weights = None,input_size = (256,256,1), loss_function = binary_crossentropy):
     inputs = Input(input_size)

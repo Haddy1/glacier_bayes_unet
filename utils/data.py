@@ -1,5 +1,5 @@
 from __future__ import print_function
-from keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import numpy as np
 import os
 import glob
@@ -70,7 +70,7 @@ def trainGenerator(batch_size,train_path,image_folder,mask_folder,aug_dict=None,
         shuffle=shuffle,
         seed = seed)
 
-    if len(image_generator) != len(mask_generator.filepaths):
+    if len(image_generator.filepaths) != len(mask_generator.filepaths):
         raise AssertionError("Different nr of input images and mask images")
 
     train_generator = zip(image_generator, mask_generator)
@@ -127,14 +127,16 @@ def trainGeneratorUncertainty(batch_size,train_path,image_folder,mask_folder, un
         shuffle=shuffle,
         seed = seed)
 
-    if len(image_generator) != len(mask_generator.filepaths):
+    if len(image_generator.filepaths) != len(mask_generator.filepaths):
         raise AssertionError("Different nr of input images and mask images")
+    if len(image_generator.filepaths) != len(uncertainty_generator.filepaths):
+        raise AssertionError("Different nr of input images and uncertainty images")
 
     train_generator = zip(image_generator, uncertainty_generator, mask_generator)
     for (img,uncertainty,mask) in train_generator:
         uncertainty = uncertainty / 65535
         img,mask = adjustData(img,mask,flag_multi_class,num_class)
-        combined = np.concatenate((img, uncertainty), axis=2)
+        combined = np.concatenate((img, uncertainty), axis=3)
         yield (combined,mask)
 
 def imgGenerator(batch_size,train_path,image_folder,aug_dict=None,image_color_mode = "grayscale",
@@ -160,6 +162,50 @@ def imgGenerator(batch_size,train_path,image_folder,aug_dict=None,image_color_mo
         image_generator.filenames = [f[(len(str(image_generator.directory)))+1:] for f in image_generator._filepaths]
 
     return image_generator
+
+def imgGeneratorUncertainty(batch_size,train_path,image_folder, uncertainty_folder,aug_dict=None,image_color_mode = "grayscale",
+                 target_size = (256,256),seed = 1, shuffle=True):
+
+    if aug_dict == None:
+        image_datagen = ImageDataGenerator(preprocessing_function=lambda img: img /255)
+    else:
+        image_datagen = ImageDataGenerator(**aug_dict)
+
+    image_generator = image_datagen.flow_from_directory(
+        train_path,
+        classes = [image_folder],
+        class_mode = None,
+        color_mode = image_color_mode,
+        target_size = target_size,
+        batch_size = batch_size,
+        shuffle=shuffle,
+        seed = seed)
+    uncertainty_generator= image_datagen.flow_from_directory(
+        train_path,
+        classes = [uncertainty_folder],
+        class_mode = None,
+        color_mode = image_color_mode,
+        target_size = target_size,
+        batch_size = batch_size,
+        shuffle=shuffle,
+        seed = seed)
+    if not shuffle:
+        # sort files with natural string sorting i.e. 0,1,2,10, not 0,1,10,2
+        nat_sort(image_generator._filepaths)
+        image_generator.filenames = [f[(len(str(image_generator.directory)))+1:] for f in image_generator._filepaths]
+        nat_sort(uncertainty_generator._filepaths)
+        uncertainty_generator.filenames = [f[(len(str(uncertainty_generator.directory)))+1:] for f in uncertainty_generator._filepaths]
+
+    if len(image_generator.filepaths) != len(uncertainty_generator.filepaths):
+        raise AssertionError("Different nr of input images and uncertainty images")
+
+  #  img_generator = zip(image_generator, uncertainty_generator)
+    while (image_generator.batch_index * image_generator.batch_size) < image_generator.n:
+            img = next(image_generator)
+            uncertainty = next(uncertainty_generator)
+            uncertainty = uncertainty / 65535
+            combined = np.concatenate((img, uncertainty), axis=3)
+            yield (combined)
 
 class ImgGenerator():
     def __init__(self, x, batch_size=16, as_gray=True, target_size=(256,256)):

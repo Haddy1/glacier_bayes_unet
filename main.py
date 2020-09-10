@@ -3,12 +3,13 @@ import time
 from pathlib import Path
 import pickle
 import json
+import datetime
 
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-from keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger
-from keras.models import load_model
+import tensorflow.keras as keras
+from tensorflow.keras.models import load_model
 import os
 from CLR.clr_callback import CyclicLR
 from layers.BayesDropout import  BayesDropout
@@ -17,7 +18,7 @@ from utils.data import trainGenerator, imgGenerator, trainGeneratorUncertainty
 import models
 from utils import helper_functions
 from loss_functions import *
-from keras.losses import *
+from tensorflow.keras.losses import *
 from shutil import copy, rmtree
 from preprocessing.preprocessor import Preprocessor
 from preprocessing import data_generator, filter
@@ -50,7 +51,7 @@ if __name__ == '__main__':
     parser.add_argument('--image_patches', default=0, type=int, help='Training data is already split into image patches')
 
     parser.add_argument('--out_path', type=str, help='Output path for results')
-    parser.add_argument('--args.data_path', type=str, help='Path containing training and val data')
+    parser.add_argument('--data_path', type=str, help='Path containing training and val data')
     parser.add_argument('--model', default='unet_Enze19_2', type=str, help='Training Model to use - can be pretrained model')
     parser.add_argument('--drop_rate', default=0.5, type=float, help='Dropout for Bayesian Unet')
     parser.add_argument('--cyclic', default='None', type=str, help='Which cyclic learning policy to use', choices=['None', 'triangular', 'triangular2', 'exp_range' ])
@@ -60,7 +61,7 @@ if __name__ == '__main__':
     parser.add_argument('--predict', type=int, default=1, help='Evaluate prediction')
     parser.add_argument('--evaluate', type=int, default=1, help='Evaluate prediction')
     parser.add_argument('--mc_iterations', type=int, default=20, help='Nr Monte Carlo Iterations for Bayes model')
-    parser.add_argument('--secondStage', type=int, default=1, help='Second Stage training')
+    parser.add_argument('--secondStage', type=int, default=0, help='Second Stage training')
     # parser.add_argument('--Random_Seed', default=1, type=int, help='random seed number value (any integer value)')
 
     args = parser.parse_args()
@@ -81,10 +82,10 @@ if __name__ == '__main__':
     train_path = Path(args.data_path, 'train')
     if not Path(train_path, 'images').exists():
         if Path(train_path,'patches/images').exists():
-            val_path = Path(train_path, 'patches')
+            train_path = Path(train_path, 'patches')
         else:
             raise FileNotFoundError("training images Path not found")
-    if len(list(Path(val_path, 'images').glob(".png"))) == 0:
+    if len(list(Path(train_path, 'images').glob("*.png"))) == 0:
         raise FileNotFoundError("No training images were found")
 
     val_path = Path(args.data_path, 'val')
@@ -93,7 +94,7 @@ if __name__ == '__main__':
             val_path = Path(val_path, 'patches')
         else:
             raise FileNotFoundError("Validation images Path not found")
-    if len(list(Path(val_path, 'images').glob(".png"))) == 0:
+    if len(list(Path(val_path, 'images').glob("*.png"))) == 0:
         raise FileNotFoundError("No validation images were found")
 
     if args.predict:
@@ -103,7 +104,7 @@ if __name__ == '__main__':
                 test_path= Path(test_path, 'patches')
             else:
                 raise FileNotFoundError("test images Path not found")
-        if len(list(Path(test_path, 'images').glob(".png"))) == 0:
+        if len(list(Path(test_path, 'images').glob("*.png"))) == 0:
             raise FileNotFoundError("No test images were found")
 
 
@@ -156,8 +157,16 @@ if __name__ == '__main__':
                                          train_path=str(patches_path_train),
                                          image_folder='images',
                                          mask_folder='masks',
+                                         uncertainty_folder='uncertainty',
                                          aug_dict=None,
                                          save_to_dir=None)
+        val_Generator = trainGeneratorUncertainty(batch_size=batch_size,
+                                                train_path=str(patches_path_val),
+                                                image_folder='images',
+                                                mask_folder='masks',
+                                                uncertainty_folder='uncertainty',
+                                                aug_dict=None,
+                                                save_to_dir=None)
     else:
         train_Generator = trainGenerator(batch_size=batch_size,
                                          train_path=str(patches_path_train),
@@ -166,12 +175,12 @@ if __name__ == '__main__':
                                          aug_dict=None,
                                          save_to_dir=None)
 
-    val_Generator = trainGenerator(batch_size=batch_size,
-                                   train_path=str(patches_path_val),
-                                   image_folder='images',
-                                   mask_folder='masks',
-                                   aug_dict=None,
-                                   save_to_dir=None)
+        val_Generator = trainGenerator(batch_size=batch_size,
+                                       train_path=str(patches_path_val),
+                                       image_folder='images',
+                                       mask_folder='masks',
+                                       aug_dict=None,
+                                       save_to_dir=None)
 
     loss_function = get_loss_function(args.loss, args.loss_parms)
 
@@ -185,19 +194,30 @@ if __name__ == '__main__':
         model_func = getattr(models, args.model)
         if 'bayes' in args.model:
             if args.secondStage:
-                model = model_func(loss_function=loss_function, input_size=(patch_size, patch_size, 1), drop_rate=args.drop_rate)
+                model = model_func(loss_function=loss_function,
+                                   input_size=(patch_size, patch_size, 2),
+                                   drop_rate=args.drop_rate)
             else:
-                model = model_func(loss_function=loss_function, input_size=(patch_size, patch_size, 2), drop_rate=args.drop_rate)
+                model = model_func(loss_function=loss_function,
+                                   input_size=(patch_size, patch_size, 1),
+                                   drop_rate=args.drop_rate)
         else:
-            model = model_func(loss_function=loss_function, input_size=(patch_size, patch_size, 1))
+            if args.secondStage:
+                model = model_func(loss_function=loss_function,
+                                   input_size=(patch_size, patch_size, 2))
+            else:
+                model = model_func(loss_function=loss_function,
+                                    input_size=(patch_size, patch_size, 1))
 
     callbacks = []
-    callbacks.append(CSVLogger(str(Path(out_path, model.name + '_history.csv')), append=True))
+    callbacks.append(keras.callbacks.CSVLogger(str(Path(out_path, model.name + '_history.csv')), append=True))
 
-    model_checkpoint = ModelCheckpoint(str(Path(out_path, model.name + '_checkpoint.hdf5')), monitor='val_loss', verbose=0,
-                                       save_best_only=True)
-
+    model_checkpoint = keras.callbacks.ModelCheckpoint(str(Path(out_path, model.name + '_checkpoint.hdf5')),
+                                                       monitor='val_loss',
+                                                       verbose=0,
+                                                       save_best_only=True)
     callbacks.append(model_checkpoint)
+    callbacks.append(keras.callbacks.TensorBoard(log_dir=str(Path(out_path, "logs/fit"))))
 
     print(patches_path_train)
     num_samples = len([file for file in Path(patches_path_train, 'images').rglob('*.png')])  # number of training samples
@@ -208,7 +228,7 @@ if __name__ == '__main__':
 
 
     if args.early_stopping:
-        callbacks.append(EarlyStopping('val_loss', patience=args.patience, verbose=0, mode='auto', restore_best_weights=True))
+        callbacks.append(keras.callbacks.EarlyStopping('val_loss', patience=args.patience, verbose=0, mode='auto', restore_best_weights=True))
 
     if args.cyclic is not 'None':
         if args.cyclic_parms is not None:
@@ -271,9 +291,14 @@ if __name__ == '__main__':
     img_generator = imgGenerator(args.batch_size, patches_path_val, 'images')
     mask_generator = imgGenerator(args.batch_size, patches_path_val, 'masks')
     if 'bayes' in model.name:
-        cutoff = get_cutoff_point(model, val_path, out_path=out_path, batch_size=batch_size, mc_iterations=args.mc_iterations)
+        cutoff = get_cutoff_point(model,
+                                  val_path,
+                                  out_path=out_path,
+                                  batch_size=batch_size,
+                                  mc_iterations=args.mc_iterations)
     else:
-        cutoff = get_cutoff_point(model, val_path, out_path=out_path, batch_size=batch_size)
+        cutoff = get_cutoff_point(model, val_path, out_path=out_path, batch_size=batch_size, mc_iterations=args.mc_iterations)
+    cutoff = 0.5
 
     # resave arguments including cutoff point
     with open(Path(out_path, 'options.json'), 'w') as f:
@@ -283,9 +308,43 @@ if __name__ == '__main__':
     if args.predict:
         test_path = str(Path(args.data_path, 'test'))
         if 'bayes' in model.name:
-            predict_bayes(model, Path(test_path, 'images'), out_path, batch_size=batch_size, patch_size=patch_size, preprocessor=preprocessor, cutoff=cutoff, mc_iterations=args.mc_iterations)
+            if args.second_stage:
+                predict_bayes(model,
+                              Path(test_path, 'images'),
+                              out_path,
+                              uncert_path=Path(test_path, 'uncertainty'),
+                              batch_size=batch_size,
+                              patch_size=patch_size,
+                              preprocessor=preprocessor,
+                              cutoff=cutoff,
+                              mc_iterations=args.mc_iterations)
+            else:
+                predict_bayes(model,
+                              Path(test_path, 'images'),
+                              out_path,
+                              batch_size=batch_size,
+                              patch_size=patch_size,
+                              preprocessor=preprocessor,
+                              cutoff=cutoff,
+                              mc_iterations=args.mc_iterations)
         else:
-            predict(model, Path(test_path, 'images'), out_path, batch_size=batch_size, patch_size=patch_size, preprocessor=preprocessor, cutoff=cutoff)
+            if args.second_stage:
+                predict(model,
+                        Path(test_path, 'images'),
+                        out_path,
+                        uncert_path=Path(test_path, 'uncertainty') ,
+                        batch_size=batch_size,
+                        patch_size=patch_size,
+                        preprocessor=preprocessor,
+                        cutoff=cutoff)
+            else:
+                predict(model,
+                        Path(test_path, 'images'),
+                        out_path,
+                        batch_size=batch_size,
+                        patch_size=patch_size,
+                        preprocessor=preprocessor,
+                        cutoff=cutoff)
         if args.evaluate:
             evaluate.evaluate(Path(test_path, 'masks'), out_path)
 

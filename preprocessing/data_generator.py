@@ -190,7 +190,10 @@ def generate_subset(data_dir, out_dir, set_size=None, patch_size=256, preprocess
         files_img = list(Path(data_dir, 'images').glob('*.png'))
 
     if set_size is not None:
-        img_subset = random.sample(files_img, set_size)
+        if set_size < 1:
+            img_subset = random.sample(files_img, int(set_size * len(files_img)))
+        else:
+            img_subset = random.sample(files_img, set_size)
     else:
         img_subset = files_img
 
@@ -201,6 +204,8 @@ def generate_subset(data_dir, out_dir, set_size=None, patch_size=256, preprocess
             Path(out_dir, 'images').mkdir(parents=True)
         if not Path(out_dir, 'masks').exists():
             Path(out_dir, 'masks').mkdir()
+        if Path(data_dir, 'uncertainty').exists() and not Path(out_dir, 'uncertainty').exists():
+            Path(out_dir, 'uncertainty').mkdir()
 
         for f in img_subset:
             print(f)
@@ -227,6 +232,7 @@ def generate_subset(data_dir, out_dir, set_size=None, patch_size=256, preprocess
             for img, uncertainty, mask_zones ,augmentation  in zip(imgs, uncertainties, masks_zones, augs):
                 cv2.imwrite(str(Path(out_dir, 'images', basename + augmentation + '.png')), img)
                 cv2.imwrite(str(Path(out_dir, 'masks', basename + augmentation + '_zones.png')), mask_zones)
+                cv2.imwrite(str(Path(out_dir, 'uncertainty', basename + augmentation + '_uncertainty.png')), uncertainty)
 
     if patch_size is not None:
         process_data(data_dir, Path(out_dir, 'patches'), patch_size=patch_size, preprocessor=preprocessor, img_list=img_subset, augment=augment, front_zone_only=front_zone_only, border=border)
@@ -239,9 +245,13 @@ def split_set(data_dir, out_dir1, out_dir2, split):
     if not Path(out_dir1).exists():
         Path(out_dir1, 'images').mkdir(parents=True)
         Path(out_dir1, 'masks').mkdir(parents=True)
+        if Path(data_dir, 'uncertainty').exists():
+            Path(out_dir1, 'uncertainty').mkdir(parents=True)
     if not Path(out_dir2).exists():
         Path(out_dir2, 'images').mkdir(parents=True)
         Path(out_dir2, 'masks').mkdir(parents=True)
+        if Path(data_dir, 'uncertainty').exists():
+            Path(out_dir2, 'uncertainty').mkdir(parents=True)
 
     files_img = list(Path(data_dir, 'images').glob('*.png'))
     random.shuffle(files_img)
@@ -256,11 +266,13 @@ def split_set(data_dir, out_dir1, out_dir2, split):
         basename = f.stem
         copy(f, Path(out_dir1, 'images'))
         copy(Path(data_dir, 'masks', basename + '_zones.png'), Path(out_dir1, 'masks'))
+        copy(Path(data_dir, 'uncertainty', basename + '_uncertainty.png'), Path(out_dir1, 'uncertainty'))
 
     for f in set2:
         basename = f.stem
         copy(f, Path(out_dir2, 'images'))
         copy(Path(data_dir, 'masks', basename + '_zones.png'), Path(out_dir2, 'masks'))
+        copy(Path(data_dir, 'uncertainty', basename + '_uncertainty.png'), Path(out_dir2, 'uncertainty'))
 
 
 def bayes_train_gen(img_path, pred_path, out_path, uncertainty_threshold = 1e-3):
@@ -292,7 +304,15 @@ if __name__ == "__main__":
     preprocessor = preprocessor.Preprocessor()
 
     data_dir = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn')
-    out_dir = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_front_only')
+    out_dir = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_proto')
+
+    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=True, set_size=0.1)
+    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=False, set_size=0.1)
+    generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=False, set_size=0.1)
+    #generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=True)
+    #generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=True)
+    #generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=True)
+
 
     #out_dir = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_pix2pix')
     #data_dir = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn')
@@ -301,9 +321,9 @@ if __name__ == "__main__":
     #generate_pix2pix_set(Path(data_dir, 'val'), Path(out_dir, 'val'), patch_size=256)
     #generate_pix2pix_set(Path(data_dir, 'test'), Path(out_dir, 'test'), patch_size=256)
     #generate_pix2pix_set(Path(data_dir, 'unlabeled'), Path(out_dir, 'unlabeled'), patch_size=256)
-    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patch_size=256, front_zone_only=True, patches_only=True, augment=None)
-    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patch_size=256, augment=None, front_zone_only=True)
-    generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patch_size=256, front_zone_only=True)
+    #generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patch_size=256, front_zone_only=True, patches_only=True, augment=None)
+    #generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patch_size=256, augment=None, front_zone_only=True)
+    #generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patch_size=256, front_zone_only=True)
     #generate_subset(Path(data_dir, 'unlabeled'), Path(out_dir, 'unlabeled'), patch_size=256, front_zone_only=True, patches_only=True, augment=None)
     #generate_subset(Path(out_dir, 'val'), Path(out_dir, 'val'), patch_size=256)
     #generate_subset(Path(out_dir, 'test'), Path(out_dir, 'test'), patch_size=256)

@@ -26,16 +26,23 @@ from multiprocessing import Pool
 from functools import partial
 import shutil
 
-def predict(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None):
+def predict(model, img_path, out_path, uncert_path=None, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None):
     if not Path(out_path).exists():
         Path(out_path).mkdir(parents=True)
 
     for filename in Path(img_path).rglob('*.png'):
         print(filename)
         img = io.imread(filename, as_gray=True)
+        img = img / 255
+        if uncert_path is not None:
+            if Path(uncert_path, filename.stem + '_uncertainty.png').exists():
+                uncert = io.imread(Path(uncert_path, filename.stem + '_uncertainty.png'), as_gray=True)
+            else:
+                uncert = io.imread(Path(uncert_path, filename.stem + '.png'), as_gray=True)
+            uncert = uncert / 65535
+            img = np.stack((img, uncert), axis=-1)
         if preprocessor is not None:
             img = preprocessor.process(img)
-        img = img / 255
         img_pad = cv2.copyMakeBorder(img, 0, (patch_size - img.shape[0]) % patch_size, 0, (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
         p_img, i_img = extract_grayscale_patches(img_pad, (patch_size, patch_size), stride = (patch_size, patch_size))
         p_img = np.reshape(p_img,p_img.shape+(1,))
@@ -56,21 +63,27 @@ def predict(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5
 
         io.imsave(Path(out_path, filename.stem + '_pred.png'), mask_predicted.astype(np.uint8))
 
-def predict_bayes(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 20, uncertainty_threshold=1e-3):
+def predict_bayes(model, img_path, out_path, uncert_path=None, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 20, uncertainty_threshold=1e-3):
     if not Path(out_path).exists():
         Path(out_path).mkdir(parents=True)
-
-    predict_options = {'mc_iterations': mc_iterations}
 
     for filename in Path(img_path).rglob('*.png'):
         #print(filename)
         img = io.imread(filename, as_gray=True)
+        img = img / 255
+        if uncert_path is not None:
+            if Path(uncert_path, filename.stem + '_uncertainty.png').exists():
+                uncert = io.imread(Path(uncert_path, filename.stem + '_uncertainty.png'), as_gray=True)
+            else:
+                uncert = io.imread(Path(uncert_path, filename.stem + '.png'), as_gray=True)
+            uncert = uncert / 65535
+            img = np.stack((img, uncert), axis=-1)
         if preprocessor is not None:
             img = preprocessor.process(img)
-        img = img / 255
         img_pad = cv2.copyMakeBorder(img, 0, (patch_size - img.shape[0]) % patch_size, 0, (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
         p_img, i_img = extract_grayscale_patches(img_pad, (patch_size, patch_size), stride = (patch_size, patch_size))
         p_img = np.reshape(p_img,p_img.shape+(1,))
+
 
         predictions = []
         for i in range(mc_iterations):
@@ -119,7 +132,11 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, c
     tmp_dir = Path(out_path, 'cutoff_tmp', patches_only=False)
 
     index_data = process_imgs(Path(val_path, 'images'), Path(tmp_dir, 'images'), patch_size=patch_size, preprocessor=preprocessor)
-    img_generator = imgGenerator(batch_size, tmp_dir, 'images', target_size=(patch_size, patch_size), shuffle=False)
+    if model.input_shape[3] == 2:
+        process_imgs(Path(val_path, 'uncertainty'), Path(tmp_dir, 'uncertainty'), patch_size=patch_size, preprocessor=preprocessor)
+        img_generator = imgGeneratorUncertainty(batch_size, tmp_dir, 'images', 'uncertainty', target_size=(patch_size, patch_size), shuffle=False)
+    else:
+        img_generator = imgGenerator(batch_size, tmp_dir, 'images', target_size=(patch_size, patch_size), shuffle=False)
     results = model.predict(img_generator)
     if mc_iterations:
         for iter in range(1,mc_iterations):
@@ -185,7 +202,7 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, c
     return cutoff_pt
 
 
-def predict_patches_only(model, img_path, out_path, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 20, uncertainty_threshold=1e-3):
+def predict_patches_only(model, img_path, out_path, uncert_path, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 20, uncertainty_threshold=1e-3):
     if not Path(out_path).exists():
         Path(out_path).mkdir(parents=True)
 
@@ -194,9 +211,16 @@ def predict_patches_only(model, img_path, out_path, batch_size=16, patch_size=25
     for filename in Path(img_path).rglob('*.png'):
         #print(filename)
         img = io.imread(filename, as_gray=True)
+        img = img / 255
+        if uncert_path is not None:
+            if Path(uncert_path, filename.stem + '_uncertainty.png').exists():
+                uncert = io.imread(Path(uncert_path, filename.stem + '_uncertainty.png'), as_gray=True)
+            else:
+                uncert = io.imread(Path(uncert_path, filename.stem + '.png'), as_gray=True)
+            uncert = uncert / 65535
+            img = np.stack((img, uncert), axis=-1)
         if preprocessor is not None:
             img = preprocessor.process(img)
-        img = img / 255
         patches.append(img)
         index.append(filename.stem)
     for b_index in range((len(patches) // batch_size) +1):
@@ -246,6 +270,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_path', type=str, help='Path containing trained model')
     parser.add_argument('--img_path', type=str, help='Path containing images to be segmented')
     parser.add_argument('--out_path', type=str, help='output path for predictions')
+    parser.add_argument('--uncert_path', type=str, help='Path containing uncertainty images')
     parser.add_argument('--gt_path', type=str, help='Path containing the ground truth, necessary for evaluation_scripts')
     parser.add_argument('--batch_size', default=1, type=int, help='batch size (integer value)')
     parser.add_argument('--cutoff', type=float, help='cutoff point of binarisation')
@@ -259,6 +284,10 @@ if __name__ == '__main__':
     if args.gt_path:
         if not Path(args.gt_path).exists():
             print(args.gt_path + " does not exist")
+    if args.uncert_path:
+        uncert_path = Path(args.uncert_path)
+    else:
+        uncert_path = None
 
     model_path = Path(args.model_path)
     options = json.load(open(Path(model_path, 'options.json'), 'r'))
@@ -300,11 +329,11 @@ if __name__ == '__main__':
     if 'bayes' in model_name:
         print("Bayes")
         if args.patches_only:
-            predict_patches_only(model, args.img_path, out_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
+            predict_patches_only(model, args.img_path, out_path, uncert_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
         else:
-            predict_bayes(model, args.img_path, out_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
+            predict_bayes(model, args.img_path, out_path, uncert_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
     else:
-        predict(model, args.img_path, out_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
+        predict(model, args.img_path, out_path,uncert_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
 
     if args.gt_path:
         evaluate(args.gt_path, out_path)
