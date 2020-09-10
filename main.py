@@ -13,7 +13,7 @@ import os
 from CLR.clr_callback import CyclicLR
 from layers.BayesDropout import  BayesDropout
 
-from utils.data import trainGenerator
+from utils.data import trainGenerator, imgGenerator
 import models
 from utils import helper_functions
 from loss_functions import *
@@ -50,7 +50,7 @@ if __name__ == '__main__':
     parser.add_argument('--image_patches', default=0, type=int, help='Training data is already split into image patches')
 
     parser.add_argument('--out_path', type=str, help='Output path for results')
-    parser.add_argument('--data_path', type=str, help='Path containing training and val data')
+    parser.add_argument('--args.data_path', type=str, help='Path containing training and val data')
     parser.add_argument('--model', default='unet_Enze19_2', type=str, help='Training Model to use - can be pretrained model')
     parser.add_argument('--drop_rate', default=0.5, type=float, help='Dropout for Bayesian Unet')
     parser.add_argument('--cyclic', default='None', type=str, help='Which cyclic learning policy to use', choices=['None', 'triangular', 'triangular2', 'exp_range' ])
@@ -77,11 +77,34 @@ if __name__ == '__main__':
     else:
         batch_size = args.batch_size
 
+    train_path = Path(args.data_path, 'train')
+    if not Path(train_path, 'images').exists():
+        if Path(train_path,'patches/images').exists():
+            val_path = Path(train_path, 'patches')
+        else:
+            raise FileNotFoundError("training images Path not found")
+    if len(list(Path(val_path, 'images').glob(".png"))) == 0:
+        raise FileNotFoundError("No training images were found")
 
-    if args.data_path:
-        data_path = Path(args.data_path)
-    else:
-        data_path = Path('data')
+    val_path = Path(args.data_path, 'val')
+    if not Path(val_path, 'images').exists():
+        if Path(val_path,'patches/images').exists():
+            val_path = Path(val_path, 'patches')
+        else:
+            raise FileNotFoundError("Validation images Path not found")
+    if len(list(Path(val_path, 'images').glob(".png"))) == 0:
+        raise FileNotFoundError("No validation images were found")
+
+    if args.predict:
+        test_path = Path(args.data_path, 'test')
+        if not Path(test_path, 'images').exists():
+            if Path(test_path,'patches/images').exists():
+                test_path= Path(test_path, 'patches')
+            else:
+                raise FileNotFoundError("test images Path not found")
+        if len(list(Path(test_path, 'images').glob(".png"))) == 0:
+            raise FileNotFoundError("No test images were found")
+
 
     if args.out_path:
         out_path = Path(args.out_path)
@@ -105,18 +128,18 @@ if __name__ == '__main__':
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(25, 25))  # CLAHE adaptive contrast enhancement
         preprocessor.add_filter(clahe.apply)
 
-    patches_path_train = Path(data_path, 'train/patches')
+    patches_path_train = Path(args.data_path, 'train/patches')
     if not patches_path_train.exists() or not Path(patches_path_train, 'image_list.json').exists() or len(json.load(open(Path(patches_path_train, 'image_list.json'), 'r')).keys()) == 0:
         if args.image_patches:
-            patches_path_train = Path(data_path, 'train')
-        data_generator.process_data(Path(data_path, 'train'), Path(patches_path_train), patch_size=patch_size,
+            patches_path_train = Path(args.data_path, 'train')
+        data_generator.process_data(Path(args.data_path, 'train'), Path(patches_path_train), patch_size=patch_size,
                                         preprocessor=preprocessor)
 
-    patches_path_val = Path(data_path, 'val/patches')
+    patches_path_val = Path(args.data_path, 'val/patches')
     if not patches_path_val.exists() or not Path(patches_path_val, 'image_list.json').exists() or len(json.load(open(Path(patches_path_val, 'image_list.json'), 'r')).keys()) == 0:
         if args.image_patches:
-            patches_path_val = Path(data_path, 'val')
-        data_generator.process_data(Path(data_path, 'val'), Path(patches_path_val), patch_size=patch_size,
+            patches_path_val = Path(args.data_path, 'val')
+        data_generator.process_data(Path(args.data_path, 'val'), Path(patches_path_val), patch_size=patch_size,
                                         preprocessor=preprocessor)
 
     # copy image file list to output
@@ -233,10 +256,12 @@ if __name__ == '__main__':
             rmtree(Path(out_path, 'patches'))
 
     print("Finding optimal cutoff point")
+    img_generator = imgGenerator(args.batch_size, patches_path_val, 'images')
+    mask_generator = imgGenerator(args.batch_size, patches_path_val, 'masks')
     if 'bayes' in model.name:
-        cutoff = get_cutoff_point(model, val_Generator, out_path=out_path, batch_size=batch_size, mc_iterations=args.mc_iterations)
+        cutoff = get_cutoff_point(model, val_path, out_path=out_path, batch_size=batch_size, mc_iterations=args.mc_iterations)
     else:
-        cutoff = get_cutoff_point(model, val_Generator, out_path=out_path, batch_size=batch_size)
+        cutoff = get_cutoff_point(model, val_path, out_path=out_path, batch_size=batch_size)
 
     # resave arguments including cutoff point
     with open(Path(out_path, 'options.json'), 'w') as f:
@@ -244,7 +269,7 @@ if __name__ == '__main__':
         f.write(json.dumps(vars(args)))
 
     if args.predict:
-        test_path = str(Path(data_path, 'test'))
+        test_path = str(Path(args.data_path, 'test'))
         if 'bayes' in model.name:
             predict_bayes(model, Path(test_path, 'images'), out_path, batch_size=batch_size, patch_size=patch_size, preprocessor=preprocessor, cutoff=cutoff, mc_iterations=args.mc_iterations)
         else:

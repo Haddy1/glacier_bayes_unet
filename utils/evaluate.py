@@ -43,7 +43,7 @@ def evaluate(gt_path, pred_path, out_path=None):
     for f in gt_path.glob("*.png"):
         gt_files.append(str(f))
         if "_zones.png" in f.name:
-            basename = f[:f.name.rfind('_')]
+            basename = f.name[:f.name.rfind('_')]
         else:
             basename = f.stem
         img_names.append(basename + '.png')
@@ -225,10 +225,10 @@ def eval_uncertainty(file, out_file, vmin=0, vmax=0.2):
     plt.savefig(out_file, bbox_inches='tight', format='png', dpi=200)
 
 if __name__ == '__main__':
-    path = Path('/home/andreas/glacier-front-detection/output_pix2pix_front_only/Jakobshavn_front_only_')
+    path = Path('/home/andreas/glacier-front-detection/tmp')
 
-    test_path = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_front_only/test/patches')
-    #evaluate(Path(test_path, 'masks'), path)
+    test_path = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn/val')
+    evaluate(Path(test_path, 'masks'), path)
     #test_path = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_front_only/test')
     #history = pickle.load(open(next(path.glob('history*.pkl')), 'rb'))
     #history = pd.read_csv(Path(path,'model_1_history.csv'))
@@ -239,9 +239,9 @@ if __name__ == '__main__':
     #evaluate(Path(test_path, 'images'), Path(test_path, 'masks'), path)
     #test_path = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_front_only/test')
     #evaluate(Path(test_path, 'images'), Path(test_path, 'masks'), '/home/andreas/glacier-front-detection/output_pix2pix_/output_Jakobshavn_pix2pix')
-    for d in Path('/home/andreas/glacier-front-detection/output_pix2pix_front_only').iterdir():
-        if d.is_dir():
-            test_path = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_front_only/test/patches')
-            evaluate(Path(test_path, 'masks'), d)
+    #for d in Path('/home/andreas/glacier-front-detection/output_pix2pix_front_only').iterdir():
+    #    if d.is_dir():
+    #        test_path = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_front_only/val/patches')
+    #        evaluate(Path(test_path, 'masks'), d)
             #history = pickle.load(open(next(d.glob('history*.pkl')), 'rb'))
             #plot_history(history, Path(d, 'loss_plot.png')) # , xlim=(-10,130), ylim=(0,0.8))

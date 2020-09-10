@@ -9,6 +9,60 @@ import random
 from shutil import copy, rmtree
 from multiprocessing import Pool
 
+def process_imgs(in_dir, out_dir, patch_size=256, preprocessor = None, augment = None, border='zeros', combine=False):
+
+    if not Path(out_dir).exists():
+        Path(out_dir).mkdir(parents=True)
+
+    files_img = Path(in_dir).glob('*.png')
+
+    patch_counter = 0
+    img_patch_index = {}
+    for f in files_img:
+        basename = f.stem
+        img = cv2.imread(str(f), cv2.IMREAD_GRAYSCALE)
+        shape = img.shape
+        if preprocessor is not None:
+            img = preprocessor.process(img)
+
+
+        if border == 'zeros':
+            img = cv2.copyMakeBorder(img, 0, (patch_size - img.shape[0]) % patch_size, 0, (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
+        if border == 'crop':
+            img = img[:img.shape[0] // patch_size, :img.shape[1] // patch_size]
+
+        if augment is not None:
+            imgs, augs = augment(img)
+        else:
+            imgs = [img]
+            augs = ['']
+
+
+        for img,augmentation  in zip(imgs, augs):
+
+            p_img, i_img = image_patches.extract_grayscale_patches(img, (patch_size, patch_size), stride = (patch_size, patch_size))
+
+            patch_indices = []
+            for j in range(p_img.shape[0]):
+                if np.count_nonzero(p_img[j])/(patch_size*patch_size) >= 0 and np.count_nonzero(p_img[j])/(patch_size*patch_size) <= 1:
+                    cv2.imwrite(str(Path(out_dir, str(patch_counter)+'.png')), p_img[j])
+
+                    patch_indices.append(patch_counter) # store patch nrs used for image
+                    patch_counter += 1
+
+
+            patch_meta_data = {}
+            patch_meta_data['origin'] = [i_img[0].tolist(), i_img[1].tolist()]
+            patch_meta_data['indices'] = patch_indices
+            # Todo: Fix img shape for augmentations
+            patch_meta_data['img_shape'] = list(shape)
+
+            img_patch_index[basename+augmentation] = patch_meta_data
+
+
+    with open(Path(out_dir, 'image_list.json'), 'w') as f:
+        json.dump(img_patch_index, f)
+    return img_patch_index
 
 
 def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=None, augment = None, front_zone_only=False, border='zeros', combine=False):
@@ -101,6 +155,8 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
 
     with open(Path(out_dir, 'image_list.json'), 'w') as f:
         json.dump(img_patch_index, f)
+
+    return img_patch_index
 
 
 def generate_subset(data_dir, out_dir, set_size=None, patch_size=256, preprocessor=None, augment=None, patches_only=False, split=None, img_list=None, border='zeros', front_zone_only=False):
@@ -195,7 +251,6 @@ def bayes_train_gen(img_path, pred_path, out_path, uncertainty_threshold = 1e-3)
         if np.mean(uncertainty) < uncertainty_threshold:
             copy(f, Path(out_path, 'images'))
             copy(Path(pred_path, basename + '_pred.png'), Path(out_path, 'images'))
-
 
 
 

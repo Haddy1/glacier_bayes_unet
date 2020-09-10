@@ -3,6 +3,7 @@ import argparse
 import subprocess as sp
 from pathlib import Path
 import matplotlib
+import re
 
 def set_font_size(small=8, medium=10, bigger=12):
     matplotlib.rc('font', size=small)          # controls default text sizes
@@ -51,5 +52,21 @@ def split_datasets(dataset):
         tensors[name] = dataset.map(lambda x: x[name])
 
     return tensors
+
+def nat_sort(l):
+    def tryint(s):
+        try:
+            return int(s)
+        except ValueError:
+            return s
+
+    def alphanum_key(s):
+        """ Turn a string into a list of string and number chunks.
+        z23a" -> ["z", 23, "a"]
+        """
+        return [ tryint(c) for c in re.split('([0-9]+)', s) ]
+
+    l.sort(key=alphanum_key)
+
 
 
