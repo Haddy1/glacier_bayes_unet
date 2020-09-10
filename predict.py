@@ -137,10 +137,11 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, c
         img_generator = imgGeneratorUncertainty(batch_size, tmp_dir, 'images', 'uncertainty', target_size=(patch_size, patch_size), shuffle=False)
     else:
         img_generator = imgGenerator(batch_size, tmp_dir, 'images', target_size=(patch_size, patch_size), shuffle=False)
-    results = model.predict(img_generator)
+    max_steps = np.ceil(len(list(Path(tmp_dir, 'images').glob("*.png"))) / batch_size)
+    results = model.predict(img_generator, steps=max_steps)
     if mc_iterations:
         for iter in range(1,mc_iterations):
-            results += model.predict(img_generator)
+            results += model.predict(img_generator, steps=max_steps)
         results /= mc_iterations
     results = results.squeeze()
 

@@ -199,10 +199,7 @@ def imgGeneratorUncertainty(batch_size,train_path,image_folder, uncertainty_fold
     if len(image_generator.filepaths) != len(uncertainty_generator.filepaths):
         raise AssertionError("Different nr of input images and uncertainty images")
 
-  #  img_generator = zip(image_generator, uncertainty_generator)
-    while (image_generator.batch_index * image_generator.batch_size) < image_generator.n:
-            img = next(image_generator)
-            uncertainty = next(uncertainty_generator)
+    for img, uncertainty in zip(image_generator, uncertainty_generator):
             uncertainty = uncertainty / 65535
             combined = np.concatenate((img, uncertainty), axis=3)
             yield (combined)
