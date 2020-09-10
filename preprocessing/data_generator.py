@@ -76,6 +76,10 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
         if not Path(out_dir, 'masks').exists():
             Path(out_dir, 'masks').mkdir()
 
+    if Path(in_dir, 'uncertainty').exists() and not Path(out_dir, 'uncertainty').exists():
+        Path(out_dir, 'uncertainty').mkdir()
+
+
     if img_list:
         files_img = img_list
     else:
@@ -95,12 +99,22 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
         else:
             mask_zones = cv2.imread(str(Path(in_dir, 'masks', basename + '.png')), cv2.IMREAD_GRAYSCALE)
 
+        if Path(in_dir, 'uncertainty').exists():
+            if Path(in_dir, 'uncertainty', basename + '_uncertainty.png').exists():
+                uncertainty = cv2.imread(str(Path(in_dir, 'uncertainty', basename + '_uncertainty.png')), cv2.IMREAD_GRAYSCALE)
+            else:
+                uncertainty = cv2.imread(str(Path(in_dir, 'uncertainty', basename + '.png')), cv2.IMREAD_GRAYSCALE)
+        else:
+            uncertainty = None
+
         if border == 'zeros':
             img = cv2.copyMakeBorder(img, 0, (patch_size - img.shape[0]) % patch_size, 0, (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
             mask_zones = cv2.copyMakeBorder(mask_zones, 0, (patch_size - mask_zones.shape[0]) % patch_size, 0, (patch_size - mask_zones.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
+            uncertainty = cv2.copyMakeBorder(uncertainty, 0, (patch_size - uncertainty.shape[0]) % patch_size, 0, (patch_size - uncertainty.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
         if border == 'crop':
             img = img[:img.shape[0] // patch_size, :img.shape[1] // patch_size]
             mask_zones = masks_zones[:img.shape[0] // patch_size, :img.shape[1] // patch_size]
+            uncertainty= uncertainty[:img.shape[0] // patch_size, :img.shape[1] // patch_size]
 
         mask_zones[mask_zones == 127] = 0
         mask_zones[mask_zones == 254] = 255
@@ -108,16 +122,19 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
         if augment is not None:
             imgs, augs = augment(img)
             masks_zones, _ = augment(mask_zones)
+            uncertainties = augment(uncertainty)
         else:
             imgs = [img]
             masks_zones = [mask_zones]
+            uncertainties = [uncertainty]
             augs = ['']
 
 
-        for img, mask_zones,augmentation  in zip(imgs, masks_zones, augs):
+        for img, uncertainty, mask_zones,augmentation  in zip(imgs, uncertainties, masks_zones, augs):
 
             p_mask_zones, i_mask_zones = image_patches.extract_grayscale_patches(mask_zones, (patch_size, patch_size), stride = (patch_size, patch_size))
             p_img, i_img = image_patches.extract_grayscale_patches(img, (patch_size, patch_size), stride = (patch_size, patch_size))
+            p_uncert, i_uncert = image_patches.extract_grayscale_patches(uncertainty, (patch_size, patch_size), stride = (patch_size, patch_size))
 
             if front_zone_only:
                 front_indices = []
@@ -127,6 +144,7 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
                 front_indices = np.array(front_indices).astype(np.int)
                 p_mask_zones = p_mask_zones[front_indices]
                 i_mask_zones = (i_mask_zones[0][front_indices], i_mask_zones[1][front_indices])
+                p_uncert = p_uncert[front_indices]
                 p_img = p_img[front_indices]
 
 
@@ -139,6 +157,8 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
                     else:
                         cv2.imwrite(str(Path(out_dir, 'images/'+str(patch_counter)+'.png')), p_img[j])
                         cv2.imwrite(str(Path(out_dir, 'masks/'+str(patch_counter)+'.png')), p_mask_zones[j])
+
+                    cv2.imwrite(str(Path(out_dir, 'uncertainty/'+str(patch_counter)+'.png')), p_uncert[j])
 
                     patch_indices.append(patch_counter) # store patch nrs used for image
                     patch_counter += 1
@@ -189,15 +209,22 @@ def generate_subset(data_dir, out_dir, set_size=None, patch_size=256, preprocess
             if preprocessor is not None:
                 img = preprocessor.process(img)
             mask_zones = cv2.imread(str(Path(data_dir, 'masks', basename + '_zones.png')), cv2.IMREAD_GRAYSCALE)
+            if Path(data_dir, 'uncertainty').exists():
+                uncertainty = cv2.imread(str(Path(data_dir, 'uncertainty', basename + '_uncertainty.png')), cv2.IMREAD_GRAYSCALE)
+            else:
+                uncertainty = None
+
             if augment is not None:
                 imgs, augs = augment(img)
                 masks_zones, _ = augment(mask_zones)
+                uncertainties, _ = augment(uncertainty)
             else:
                 imgs = [img]
                 masks_zones= [mask_zones]
+                uncertainties = [uncertainty]
                 augs = ['']
 
-            for img, mask_zones ,augmentation  in zip(imgs, masks_zones, augs):
+            for img, uncertainty, mask_zones ,augmentation  in zip(imgs, uncertainties, masks_zones, augs):
                 cv2.imwrite(str(Path(out_dir, 'images', basename + augmentation + '.png')), img)
                 cv2.imwrite(str(Path(out_dir, 'masks', basename + augmentation + '_zones.png')), mask_zones)
 

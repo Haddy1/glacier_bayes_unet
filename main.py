@@ -13,7 +13,7 @@ import os
 from CLR.clr_callback import CyclicLR
 from layers.BayesDropout import  BayesDropout
 
-from utils.data import trainGenerator, imgGenerator
+from utils.data import trainGenerator, imgGenerator, trainGeneratorUncertainty
 import models
 from utils import helper_functions
 from loss_functions import *
@@ -60,6 +60,7 @@ if __name__ == '__main__':
     parser.add_argument('--predict', type=int, default=1, help='Evaluate prediction')
     parser.add_argument('--evaluate', type=int, default=1, help='Evaluate prediction')
     parser.add_argument('--mc_iterations', type=int, default=20, help='Nr Monte Carlo Iterations for Bayes model')
+    parser.add_argument('--secondStage', type=int, default=1, help='Second Stage training')
     # parser.add_argument('--Random_Seed', default=1, type=int, help='random seed number value (any integer value)')
 
     args = parser.parse_args()
@@ -150,12 +151,20 @@ if __name__ == '__main__':
 
     print(patches_path_train)
 
-    train_Generator = trainGenerator(batch_size=batch_size,
-                                     train_path=str(patches_path_train),
-                                     image_folder='images',
-                                     mask_folder='masks',
-                                     aug_dict=None,
-                                     save_to_dir=None)
+    if args.secondStage:
+        train_Generator = trainGeneratorUncertainty(batch_size=batch_size,
+                                         train_path=str(patches_path_train),
+                                         image_folder='images',
+                                         mask_folder='masks',
+                                         aug_dict=None,
+                                         save_to_dir=None)
+    else:
+        train_Generator = trainGenerator(batch_size=batch_size,
+                                         train_path=str(patches_path_train),
+                                         image_folder='images',
+                                         mask_folder='masks',
+                                         aug_dict=None,
+                                         save_to_dir=None)
 
     val_Generator = trainGenerator(batch_size=batch_size,
                                    train_path=str(patches_path_val),
@@ -175,9 +184,12 @@ if __name__ == '__main__':
     else:
         model_func = getattr(models, args.model)
         if 'bayes' in args.model:
-            model = model_func(loss_function=loss_function, input_size=(patch_size, patch_size, 1), drop_rate=args.drop_rate)
-
-        model = model_func(loss_function=loss_function, input_size=(patch_size, patch_size, 1))
+            if args.secondStage:
+                model = model_func(loss_function=loss_function, input_size=(patch_size, patch_size, 1), drop_rate=args.drop_rate)
+            else:
+                model = model_func(loss_function=loss_function, input_size=(patch_size, patch_size, 2), drop_rate=args.drop_rate)
+        else:
+            model = model_func(loss_function=loss_function, input_size=(patch_size, patch_size, 1))
 
     callbacks = []
     callbacks.append(CSVLogger(str(Path(out_path, model.name + '_history.csv')), append=True))

@@ -135,7 +135,7 @@ def trainGeneratorUncertainty(batch_size,train_path,image_folder,mask_folder, un
         uncertainty = uncertainty / 65535
         img,mask = adjustData(img,mask,flag_multi_class,num_class)
         combined = np.concatenate((img, uncertainty), axis=2)
-        yield (img,mask)
+        yield (combined,mask)
 
 def imgGenerator(batch_size,train_path,image_folder,aug_dict=None,image_color_mode = "grayscale",
                  target_size = (256,256),seed = 1, shuffle=True):
