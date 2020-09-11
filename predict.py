@@ -34,18 +34,24 @@ def predict(model, img_path, out_path, uncert_path=None, batch_size=16, patch_si
         print(filename)
         img = io.imread(filename, as_gray=True)
         img = img / 255
-        if uncert_path is not None:
-            if Path(uncert_path, filename.stem + '_uncertainty.png').exists():
-                uncert = io.imread(Path(uncert_path, filename.stem + '_uncertainty.png'), as_gray=True)
-            else:
-                uncert = io.imread(Path(uncert_path, filename.stem + '.png'), as_gray=True)
-            uncert = uncert / 65535
-            img = np.stack((img, uncert), axis=-1)
+
         if preprocessor is not None:
             img = preprocessor.process(img)
         img_pad = cv2.copyMakeBorder(img, 0, (patch_size - img.shape[0]) % patch_size, 0, (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
         p_img, i_img = extract_grayscale_patches(img_pad, (patch_size, patch_size), stride = (patch_size, patch_size))
         p_img = np.reshape(p_img,p_img.shape+(1,))
+
+        if Path(uncert_path, filename.stem + '_uncertainty.png').exists():
+            uncert = io.imread(Path(uncert_path, filename.stem + '_uncertainty.png'), as_gray=True)
+        else:
+            uncert = io.imread(Path(uncert_path, filename.stem + '.png'), as_gray=True)
+        if preprocessor is not None:
+            uncert = preprocessor.process(uncert)
+        uncert = uncert / 65535
+        uncert_pad = cv2.copyMakeBorder(uncert, 0, (patch_size - uncert.shape[0]) % patch_size, 0, (patch_size - uncert.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
+        p_uncert, i_uncert = extract_grayscale_patches(uncert_pad, (patch_size, patch_size), stride = (patch_size, patch_size))
+        p_uncert = np.reshape(p_uncert,p_uncert.shape+(1,))
+        p_img = np.array([np.concatenate((img, uncert), axis=2) for img, uncert in zip(p_img, p_uncert)])
 
         p_img_predicted = model.predict(p_img, batch_size=batch_size)
 
@@ -71,18 +77,24 @@ def predict_bayes(model, img_path, out_path, uncert_path=None, batch_size=16, pa
         #print(filename)
         img = io.imread(filename, as_gray=True)
         img = img / 255
-        if uncert_path is not None:
-            if Path(uncert_path, filename.stem + '_uncertainty.png').exists():
-                uncert = io.imread(Path(uncert_path, filename.stem + '_uncertainty.png'), as_gray=True)
-            else:
-                uncert = io.imread(Path(uncert_path, filename.stem + '.png'), as_gray=True)
-            uncert = uncert / 65535
-            img = np.stack((img, uncert), axis=-1)
         if preprocessor is not None:
             img = preprocessor.process(img)
         img_pad = cv2.copyMakeBorder(img, 0, (patch_size - img.shape[0]) % patch_size, 0, (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
         p_img, i_img = extract_grayscale_patches(img_pad, (patch_size, patch_size), stride = (patch_size, patch_size))
         p_img = np.reshape(p_img,p_img.shape+(1,))
+
+        if uncert_path is not None:
+            if Path(uncert_path, filename.stem + '_uncertainty.png').exists():
+                uncert = io.imread(Path(uncert_path, filename.stem + '_uncertainty.png'), as_gray=True)
+            else:
+                uncert = io.imread(Path(uncert_path, filename.stem + '.png'), as_gray=True)
+            if preprocessor is not None:
+                uncert = preprocessor.process(uncert)
+            uncert = uncert / 65535
+            uncert_pad = cv2.copyMakeBorder(uncert, 0, (patch_size - uncert.shape[0]) % patch_size, 0, (patch_size - uncert.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
+            p_uncert, i_uncert = extract_grayscale_patches(uncert_pad, (patch_size, patch_size), stride = (patch_size, patch_size))
+            p_uncert = np.reshape(p_uncert,p_uncert.shape+(1,))
+            p_img = np.array([np.concatenate((img, uncert), axis=2) for img, uncert in zip(p_img, p_uncert)])
 
 
         predictions = []
