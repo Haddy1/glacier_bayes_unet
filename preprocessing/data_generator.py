@@ -1,9 +1,12 @@
+from os.path import join, realpath, dirname
+import sys
+path = realpath(__file__)
+sys.path.append(join(dirname(path), "../"))
 from pathlib import Path
 import numpy as np
 import cv2
 from skimage import io
 from preprocessing import image_patches, preprocessor,augmentation
-#import image_patches, preprocessor,augmentation
 import json
 import random
 from shutil import copy, rmtree
@@ -298,17 +301,18 @@ def bayes_train_gen(img_path, pred_path, out_path, uncertainty_threshold = 1e-3)
 
 
 if __name__ == "__main__":
-    random.seed(42)
+    random.seed(1)
     patch_size = 256
 
     preprocessor = preprocessor.Preprocessor()
 
-    data_dir = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn')
-    out_dir = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_proto')
+    #data_dir = Path('/disks/data1/oc39otib/glacier-front-detection/datasets/front_detection_dataset')
+    data_dir = Path('datasets/front_detection_dataset')
+    out_dir = data_dir
 
-    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=True, set_size=0.1)
-    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=False, set_size=0.1)
-    generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=False, set_size=0.1)
+    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=True)
+    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=True)
+    generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=True)
     #generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=True)
     #generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=True)
     #generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=True)
