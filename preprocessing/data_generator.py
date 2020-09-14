@@ -303,12 +303,12 @@ if __name__ == "__main__":
 
     preprocessor = preprocessor.Preprocessor()
 
-    data_dir = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn')
-    out_dir = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_proto')
+    data_dir = Path('/home/andreas/glacier-front-detection/out_Jakobshavn_patches')
+    #out_dir = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_proto')
 
-    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=True, set_size=0.1)
-    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=False, set_size=0.1)
-    generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=False, set_size=0.1)
+    process_imgs(Path(data_dir), Path(data_dir, 'patches'))
+    #generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=False, set_size=0.1)
+    #generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=False, set_size=0.1)
     #generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=True)
     #generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=True)
     #generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=True)
@@ -325,7 +325,7 @@ if __name__ == "__main__":
     #generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patch_size=256, augment=None, front_zone_only=True)
     #generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patch_size=256, front_zone_only=True)
     #generate_subset(Path(data_dir, 'unlabeled'), Path(out_dir, 'unlabeled'), patch_size=256, front_zone_only=True, patches_only=True, augment=None)
-    #generate_subset(Path(out_dir, 'val'), Path(out_dir, 'val'), patch_size=256)
+    n#generate_subset(Path(out_dir, 'val'), Path(out_dir, 'val'), patch_size=256)
     #generate_subset(Path(out_dir, 'test'), Path(out_dir, 'test'), patch_size=256)
     #split_set(Path(out_dir, 'rest'), Path(out_dir, 'val'), Path(out_dir, 'test'), split=0.5)
     #generate_subset(Path(out_dir, 'test'), Path(out_dir, 'test'), patch_size=None)
