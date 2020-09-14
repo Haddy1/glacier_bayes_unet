@@ -308,7 +308,7 @@ if __name__ == '__main__':
     if args.predict:
         test_path = str(Path(args.data_path, 'test'))
         if 'bayes' in model.name:
-            if args.second_stage:
+            if args.secondStage:
                 predict_bayes(model,
                               Path(test_path, 'images'),
                               out_path,
@@ -328,7 +328,7 @@ if __name__ == '__main__':
                               cutoff=cutoff,
                               mc_iterations=args.mc_iterations)
         else:
-            if args.second_stage:
+            if args.secondStage:
                 predict(model,
                         Path(test_path, 'images'),
                         out_path,
