@@ -125,7 +125,7 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
         if augment is not None:
             imgs, augs = augment(img)
             masks_zones, _ = augment(mask_zones)
-            uncertainties = augment(uncertainty)
+            uncertainties, _ = augment(uncertainty)
         else:
             imgs = [img]
             masks_zones = [mask_zones]
