@@ -7,7 +7,7 @@ import matplotlib
 import tensorflow as tf
 
 def dice_coefficient_cutoff(gt, pred, cutoff):
-    pred_bin = (pred > cutoff).astype(int)
+    pred_bin = (pred >= cutoff).astype(int)
     return dice_coefficient(gt, pred_bin)
 
 

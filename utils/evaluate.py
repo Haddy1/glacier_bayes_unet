@@ -4,7 +4,7 @@ import seaborn as sns
 from scipy.spatial import distance
 import numpy as np
 from sklearn.metrics import recall_score
-from utils import metrics, metrics
+from utils import metrics
 import pandas as pd
 from matplotlib import pyplot as plt
 from multiprocessing import Pool
@@ -22,7 +22,7 @@ def eval_img(gt_file, pred_file, img_name, uncertainty_file=None):
     scores['IOU'] = metrics.IOU(gt_flat, pred_flat)
     scores['specificity'] = metrics.specificity(gt_flat, pred_flat)
     scores['sensitivity'] = recall_score(gt_flat, pred_flat)
-    scores['line_accuracy'] = metrics.line_accuracy(gt_flat, pred_flat)
+    #scores['line_accuracy'] = metrics.line_accuracy(gt_flat, pred_flat)
     if uncertainty_file:
         uncertainty_img =  io.imread(uncertainty_file, as_gray=True)
         uncertainty = uncertainty_img / 65535

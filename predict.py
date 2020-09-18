@@ -134,6 +134,7 @@ def predict_bayes(model, img_path, out_path, uncert_path=None, batch_size=16, pa
         io.imsave(Path(out_path, filename.stem + '_confidence.png'), confidence_img)
         #np.save(Path(out_path, filename.stem + '_uncertainty.npy'), uncertainty)
 
+
 def eval_dice(gt, pred, cutoff):
     assert gt.shape == pred.shape
     pred_bin = pred > cutoff
@@ -157,6 +158,8 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, c
         results /= mc_iterations
     results = results.squeeze()
 
+    results = np.load("results.npy")
+    index_data = pickle.load(open("index_data.pkl", 'rb'))
     p = Pool()
     dice_all = np.zeros(len(cutoff_pts))
     # Restore full images from patches
@@ -182,12 +185,13 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, c
 
         pred_flat = pred.flatten()
         gt_flat = gt.flatten()
-        #gt_imgs.append(gt)
+
         dice_eval = partial(dice_coefficient_cutoff, gt_flat, pred_flat)
         dice_all += np.array(p.map(dice_eval, cutoff_pts))
 
     p.close()
-    dice_all /= len(results)
+    dice_all /= len(index_data)
+    print(dice_all)
 
 
 
