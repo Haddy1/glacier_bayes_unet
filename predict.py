@@ -189,7 +189,7 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, c
 
 
     cutoff_pts_list = np.array(cutoff_pts)
-    dice_all = np.array(dice_all)
+    dice_all = np.array(dice_all) / len(index_data)
     argmax = np.argmax(dice_all)
     cutoff_pt = cutoff_pts_list[argmax]
     max_dice = dice_all[argmax]
