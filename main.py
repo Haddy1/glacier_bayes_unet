@@ -291,13 +291,13 @@ if __name__ == '__main__':
     img_generator = imgGenerator(args.batch_size, patches_path_val, 'images')
     mask_generator = imgGenerator(args.batch_size, patches_path_val, 'masks')
     if 'bayes' in model.name:
-        cutoff = get_cutoff_point(model,
+        cutoff, _ = get_cutoff_point(model,
                                   val_path,
                                   out_path=out_path,
                                   batch_size=batch_size,
                                   mc_iterations=args.mc_iterations)
     else:
-        cutoff = get_cutoff_point(model, val_path, out_path=out_path, batch_size=batch_size, mc_iterations=args.mc_iterations)
+        cutoff, _ = get_cutoff_point(model, val_path, out_path=out_path, batch_size=batch_size, mc_iterations=args.mc_iterations)
     cutoff = 0.5
 
     # resave arguments including cutoff point
