@@ -80,7 +80,7 @@ def trainGenerator(batch_size,train_path,image_folder,mask_folder,aug_dict=None,
 
 def trainGeneratorUncertainty(batch_size,train_path,image_folder,mask_folder, uncertainty_folder,aug_dict=None,image_color_mode = "grayscale",
                    mask_color_mode = "grayscale",image_save_prefix  = "image",mask_save_prefix  = "mask",
-                   flag_multi_class = False,num_class = 2,save_to_dir = None,target_size = (256,256),seed = 1, shuffle=True):
+                   flag_multi_class = False,num_class = 2,save_to_dir = None,target_size = (256,256),seed = 1, shuffle=True, uncert_threshold=None):
     '''
     can generate image and mask at the same time
     use the same seed for image_datagen and mask_datagen to ensure the transformation for image and mask is the same
@@ -134,7 +134,11 @@ def trainGeneratorUncertainty(batch_size,train_path,image_folder,mask_folder, un
 
     train_generator = zip(image_generator, uncertainty_generator, mask_generator)
     for (img,uncertainty,mask) in train_generator:
-        uncertainty = uncertainty / 9089
+        if uncert_threshold is not None:
+            uncertainty[uncertainty >= uncert_threshold] = 1
+            uncertainty[uncertainty < uncert_threshold] = 0
+        else:
+            uncertainty = uncertainty / 65535
         img,mask = adjustData(img,mask,flag_multi_class,num_class)
         combined = np.concatenate((img, uncertainty), axis=3)
         yield (combined,mask)
@@ -164,7 +168,7 @@ def imgGenerator(batch_size,train_path,image_folder,aug_dict=None,image_color_mo
     return image_generator
 
 def imgGeneratorUncertainty(batch_size,train_path,image_folder, uncertainty_folder,aug_dict=None,image_color_mode = "grayscale",
-                 target_size = (256,256),seed = 1, shuffle=True):
+                 target_size = (256,256),seed = 1, shuffle=True, uncert_threshold=None):
 
     if aug_dict == None:
         image_datagen = ImageDataGenerator(preprocessing_function=lambda img: img /255)
@@ -199,11 +203,14 @@ def imgGeneratorUncertainty(batch_size,train_path,image_folder, uncertainty_fold
     if len(image_generator.filepaths) != len(uncertainty_generator.filepaths):
         raise AssertionError("Different nr of input images and uncertainty images")
 
-    dataset_max_uncert = 9089
     for img, uncertainty in zip(image_generator, uncertainty_generator):
-            uncertainty = uncertainty / dataset_max_uncert
-            combined = np.concatenate((img, uncertainty), axis=3)
-            yield (combined)
+        if uncert_threshold is not None:
+            uncertainty[uncertainty >= uncert_threshold] = 1
+            uncertainty[uncertainty < uncert_threshold] = 0
+        else:
+            uncertainty = uncertainty / 65535
+        combined = np.concatenate((img, uncertainty), axis=3)
+        yield (combined)
 
 class ImgGenerator():
     def __init__(self, x, batch_size=16, as_gray=True, target_size=(256,256)):
