@@ -13,6 +13,7 @@ from tensorflow.keras.models import load_model
 import os
 from CLR.clr_callback import CyclicLR
 from layers.BayesDropout import  BayesDropout
+import pandas as pd
 
 from utils.data import trainGenerator, imgGenerator, trainGeneratorUncertainty
 import models
@@ -62,6 +63,8 @@ if __name__ == '__main__':
     parser.add_argument('--evaluate', type=int, default=1, help='Evaluate prediction')
     parser.add_argument('--mc_iterations', type=int, default=20, help='Nr Monte Carlo Iterations for Bayes model')
     parser.add_argument('--secondStage', type=int, default=0, help='Second Stage training')
+    parser.add_argument('--uncert_threshold', type=int, default=None, help='Nr Monte Carlo Iterations for Bayes model')
+
     # parser.add_argument('--Random_Seed', default=1, type=int, help='random seed number value (any integer value)')
 
     args = parser.parse_args()
@@ -158,6 +161,7 @@ if __name__ == '__main__':
                                          image_folder='images',
                                          mask_folder='masks',
                                          uncertainty_folder='uncertainty',
+                                         uncert_threshold=args.uncert_threshold,
                                          aug_dict=None,
                                          save_to_dir=None)
         val_Generator = trainGeneratorUncertainty(batch_size=batch_size,
@@ -165,6 +169,7 @@ if __name__ == '__main__':
                                                 image_folder='images',
                                                 mask_folder='masks',
                                                 uncertainty_folder='uncertainty',
+                                                uncert_threshold=args.uncert_threshold,
                                                 aug_dict=None,
                                                 save_to_dir=None)
     else:
@@ -252,7 +257,7 @@ if __name__ == '__main__':
 
     steps_per_epoch = np.ceil(num_samples / batch_size)
     validation_steps = np.ceil(num_val_samples / batch_size)
-    history = model.fit_generator(train_Generator,
+    model.fit_generator(train_Generator,
                                   steps_per_epoch=steps_per_epoch,
                                   epochs=args.epochs,
                                   validation_data=val_Generator,
@@ -261,17 +266,17 @@ if __name__ == '__main__':
 
     # # save model
     model.save(str(Path(out_path, 'model_' + model.name + '.h5').absolute()))
-    try:
-        pickle.dump(history.history, open(Path(out_path, 'history_' + model.name + '.pkl'), 'wb'))
-    except:
-        print("History could not be saved")
     ##########
     ##########
     # save loss plot
+
+    # Load history from file, in case of continued training it contains the history of previous training
+    history = pd.read_csv(Path(out_path, model.name + '_history.csv'))
     plt.figure()
     plt.rcParams.update({'font.size': 18})
-    plt.plot(model.history.epoch, model.history.history['loss'], 'X-', label='training loss', linewidth=4.0)
-    plt.plot(model.history.epoch, model.history.history['val_loss'], 'o-', label='val loss', linewidth=4.0)
+
+    plt.plot(history['epoch'], history['loss'], 'X-', label='training loss', linewidth=4.0)
+    plt.plot(history['epoch'], history['val_loss'], 'o-', label='val loss', linewidth=4.0)
     plt.xlabel('epoch')
     plt.ylabel('loss')
     plt.legend(loc='upper right')
@@ -313,6 +318,7 @@ if __name__ == '__main__':
                               Path(test_path, 'images'),
                               out_path,
                               uncert_path=Path(test_path, 'uncertainty'),
+                              uncert_threshold=args.uncert_threshold,
                               batch_size=batch_size,
                               patch_size=patch_size,
                               preprocessor=preprocessor,
@@ -333,6 +339,7 @@ if __name__ == '__main__':
                         Path(test_path, 'images'),
                         out_path,
                         uncert_path=Path(test_path, 'uncertainty') ,
+                        uncert_threshold=args.uncert_threshold,
                         batch_size=batch_size,
                         patch_size=patch_size,
                         preprocessor=preprocessor,
