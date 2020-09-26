@@ -134,11 +134,10 @@ def trainGeneratorUncertainty(batch_size,train_path,image_folder,mask_folder, un
 
     train_generator = zip(image_generator, uncertainty_generator, mask_generator)
     for (img,uncertainty,mask) in train_generator:
+        uncertainty = uncertainty / 65535
         if uncert_threshold is not None:
             uncertainty[uncertainty >= uncert_threshold] = 1
             uncertainty[uncertainty < uncert_threshold] = 0
-        else:
-            uncertainty = uncertainty / 65535
         img,mask = adjustData(img,mask,flag_multi_class,num_class)
         combined = np.concatenate((img, uncertainty), axis=3)
         yield (combined,mask)
@@ -197,18 +196,17 @@ def imgGeneratorUncertainty(batch_size,train_path,image_folder, uncertainty_fold
         # sort files with natural string sorting i.e. 0,1,2,10, not 0,1,10,2
         nat_sort(image_generator._filepaths)
         image_generator.filenames = [f[(len(str(image_generator.directory)))+1:] for f in image_generator._filepaths]
-        nat_sort(uncertainty_generator._filepaths)
+        uncertainty_generator._filepaths = [str(train_path) + '/' + uncertainty_folder + '/' + os.path.basename(filepath) for filepath in image_generator._filepaths]
         uncertainty_generator.filenames = [f[(len(str(uncertainty_generator.directory)))+1:] for f in uncertainty_generator._filepaths]
 
     if len(image_generator.filepaths) != len(uncertainty_generator.filepaths):
         raise AssertionError("Different nr of input images and uncertainty images")
 
     for img, uncertainty in zip(image_generator, uncertainty_generator):
+        uncertainty = uncertainty / 65535
         if uncert_threshold is not None:
             uncertainty[uncertainty >= uncert_threshold] = 1
             uncertainty[uncertainty < uncert_threshold] = 0
-        else:
-            uncertainty = uncertainty / 65535
         combined = np.concatenate((img, uncertainty), axis=3)
         yield (combined)
 

@@ -68,7 +68,7 @@ def process_imgs(in_dir, out_dir, patch_size=256, preprocessor = None, augment =
     return img_patch_index
 
 
-def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=None, augment = None, front_zone_only=False, border='zeros', combine=False, uncert_normalization=False):
+def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=None, augment = None, front_zone_only=False, border='zeros', combine=False, uncert_minmax=False):
 
     if not Path(out_dir).exists():
         Path(out_dir).mkdir(parents=True)
@@ -108,7 +108,7 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
             else:
                 uncertainty = cv2.imread(str(Path(in_dir, 'uncertainty', basename + '.png')), cv2.IMREAD_GRAYSCALE)
 
-            if uncert_normalization:
+            if uncert_minmax:
                 uncertainty = 65535 * (uncertainty - uncertainty.min()) / (uncertainty.max() - uncertainty.min())
                 uncertainty = uncertainty.astype(np.uint16)
         else:
@@ -186,7 +186,7 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
     return img_patch_index
 
 
-def generate_subset(data_dir, out_dir, set_size=None, patch_size=256, preprocessor=None, augment=None, patches_only=False, split=None, img_list=None, border='zeros', front_zone_only=False, uncert_normalization=False):
+def generate_subset(data_dir, out_dir, split=None, patch_size=256, preprocessor=None, augment=None, patches_only=False, img_list=None, border='zeros', front_zone_only=False, uncert_minmax=False):
     if not Path(data_dir).exists():
         print(str(data_dir) + " does not exist")
 
@@ -196,11 +196,11 @@ def generate_subset(data_dir, out_dir, set_size=None, patch_size=256, preprocess
     else:
         files_img = list(Path(data_dir, 'images').glob('*.png'))
 
-    if set_size is not None:
-        if set_size < 1:
-            img_subset = random.sample(files_img, int(set_size * len(files_img)))
+    if split is not None:
+        if split < 1:
+            img_subset = random.sample(files_img, int(split * len(files_img)))
         else:
-            img_subset = random.sample(files_img, set_size)
+            img_subset = random.sample(files_img, split)
     else:
         img_subset = files_img
 
@@ -223,7 +223,7 @@ def generate_subset(data_dir, out_dir, set_size=None, patch_size=256, preprocess
             mask_zones = cv2.imread(str(Path(data_dir, 'masks', basename + '_zones.png')), cv2.IMREAD_GRAYSCALE)
             if Path(data_dir, 'uncertainty').exists():
                 uncertainty = cv2.imread(str(Path(data_dir, 'uncertainty', basename + '_uncertainty.png')), cv2.IMREAD_GRAYSCALE)
-                if uncert_normalization:
+                if uncert_minmax:
                     uncertainty = 65535 * (uncertainty - uncertainty.min()) / (uncertainty.max() - uncertainty.min())
                     uncertainty = uncertainty.astype(np.uint16)
             else:
@@ -253,7 +253,7 @@ def generate_subset(data_dir, out_dir, set_size=None, patch_size=256, preprocess
                      augment=augment,
                      front_zone_only=front_zone_only,
                      border=border,
-                     uncert_normalization=uncert_normalization)
+                     uncert_minmax=uncert_minmax)
 
 def generate_pix2pix_set(data_dir, out_dir, patch_size=256, front_zone_only=True, border='zeros', combine=True):
     process_data(data_dir, Path(out_dir), patch_size=patch_size, front_zone_only=front_zone_only, border=border, combine=combine)
@@ -323,11 +323,11 @@ if __name__ == "__main__":
 
     #data_dir = Path('/disks/data1/oc39otib/glacier-front-detection/datasets/front_detection_dataset')
     data_dir = Path('datasets/front_detection_dataset')
-    out_dir = Path('datasets/front_detection_dataset_frontonly_norm')
+    out_dir = Path('datasets/front_detection_dataset_norm_val')
 
-    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=True, uncert_normalization=True, front_zone_only=True)
-    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=False, uncert_normalization=True, front_zone_only=True)
-    generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=False, uncert_normalization=True, front_zone_only=True)
+    #generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=True, uncert_minmax=True, front_zone_only=True)
+    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=False, uncert_minmax=True, front_zone_only=False, split=4)
+    #generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=False, uncert_minmax=True, front_zone_only=True)
     #generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=True)
     #generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=True)
     #generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=True)

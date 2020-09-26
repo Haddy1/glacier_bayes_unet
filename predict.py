@@ -97,10 +97,9 @@ def predict_bayes(model, img_path, out_path, uncert_path=None, uncert_threshold=
             if preprocessor is not None:
                 uncert = preprocessor.process(uncert)
 
+            uncert = uncert / 65535
             if uncert_threshold is not None:
                 uncert = (uncert >= uncert_threshold).astype(float)
-            else:
-                uncert = uncert / 65535
             uncert_pad = cv2.copyMakeBorder(uncert, 0, (patch_size - uncert.shape[0]) % patch_size, 0, (patch_size - uncert.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
             p_uncert, i_uncert = extract_grayscale_patches(uncert_pad, (patch_size, patch_size), stride = (patch_size, patch_size))
             p_uncert = np.reshape(p_uncert,p_uncert.shape+(1,))
@@ -140,9 +139,91 @@ def predict_bayes(model, img_path, out_path, uncert_path=None, uncert_threshold=
 
         confidence_img = mask_predicted[:,:,None] * np.ones((img.shape[0], img.shape[1], 3)) # broadcast to rgb img
         confidence_img = confidence_img.astype(np.uint8)
-        confidence_img[uncertainty >= uncert_threshold, :] = np.array([255, 0,0])   # make  uncertain pixels red
+        if uncert_threshold is not None:
+            confidence_img[uncertainty >= uncert_threshold, :] = np.array([255, 0,0])   # make  uncertain pixels red
         io.imsave(Path(out_path, filename.stem + '_confidence.png'), confidence_img)
         #np.save(Path(out_path, filename.stem + '_uncertainty.npy'), uncertainty)
+
+def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, cutoff_pts=np.arange(0.2, 0.8, 0.025), preprocessor=None, mc_iterations=20, uncert_threshold=None):
+    if not Path(out_path).exists():
+        Path(out_path).mkdir(parents=True)
+    img_path = Path(val_path, 'images')
+    uncert_path = Path(val_path, 'uncertainty')
+    gt_path = Path(val_path, 'masks')
+    dice_all = np.zeros(len(cutoff_pts))
+    n_img = len(list(Path(img_path).rglob('*.png')))
+    p = Pool()
+    for filename in Path(img_path).rglob('*.png'):
+        img = io.imread(filename, as_gray=True)
+        img = img / 255
+        if preprocessor is not None:
+            img = preprocessor.process(img)
+        img_pad = cv2.copyMakeBorder(img, 0, (patch_size - img.shape[0]) % patch_size, 0, (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
+        p_img, i_img = extract_grayscale_patches(img_pad, (patch_size, patch_size), stride = (patch_size, patch_size))
+        p_img = np.reshape(p_img,p_img.shape+(1,))
+
+        if model.input_shape[3] == 2 and uncert_path is not None:
+            if Path(uncert_path, filename.stem + '_uncertainty.png').exists():
+                uncert = io.imread(Path(uncert_path, filename.stem + '_uncertainty.png'), as_gray=True)
+            else:
+                uncert = io.imread(Path(uncert_path, filename.stem + '.png'), as_gray=True)
+            if preprocessor is not None:
+                uncert = preprocessor.process(uncert)
+
+            uncert = uncert / 65535
+            if uncert_threshold is not None:
+                uncert = (uncert >= uncert_threshold).astype(float)
+            uncert_pad = cv2.copyMakeBorder(uncert, 0, (patch_size - uncert.shape[0]) % patch_size, 0, (patch_size - uncert.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
+            p_uncert, i_uncert = extract_grayscale_patches(uncert_pad, (patch_size, patch_size), stride = (patch_size, patch_size))
+            p_uncert = np.reshape(p_uncert,p_uncert.shape+(1,))
+            p_img = np.array([np.concatenate((img, uncert), axis=2) for img, uncert in zip(p_img, p_uncert)])
+
+
+        predictions = []
+        for i in range(mc_iterations):
+            prediction = model.predict(p_img, batch_size=batch_size)
+            predictions.append(prediction)
+        predictions = np.array(predictions)
+
+
+        p_img_predicted = predictions.mean(axis=0)
+        p_img_predicted = np.reshape(p_img_predicted,p_img_predicted.shape[:-1])
+        mask_predicted = reconstruct_from_grayscale_patches(p_img_predicted,i_img)[0]
+        mask_predicted = mask_predicted[:img.shape[0], :img.shape[1]]
+
+        pred_flat = mask_predicted.flatten()
+
+        gt_img = io.imread(Path(gt_path, filename.stem + '_zones.png'))
+        gt = (gt_img > 200).astype(int)
+        gt_flat = gt.flatten()
+        dice_eval = partial(dice_coefficient_cutoff, gt_flat, pred_flat)
+        dice_all += np.array(p.map(dice_eval, cutoff_pts))
+
+
+
+
+    cutoff_pts_list = np.array(cutoff_pts)
+    dice_all = np.array(dice_all) / len(n_img)
+    argmax = np.argmax(dice_all)
+    cutoff_pt = cutoff_pts_list[argmax]
+    max_dice = dice_all[argmax]
+    df = pd.DataFrame({'cutoff_pts':cutoff_pts_list, 'dice': dice_all})
+    df.to_pickle(Path(out_path, 'dice_cutoff.pkl')) # Save all values for later plot changes
+
+    plt.rcParams.update({'font.size': 18})
+    plt.figure()
+    plt.plot((cutoff_pt, cutoff_pt),(0, max_dice), linestyle=':', linewidth=2, color='grey')
+    plt.plot(cutoff_pts_list, dice_all)
+    plt.annotate(f'{max_dice:.2f}', (cutoff_pt, max_dice), fontsize='x-small')
+    plt.ylabel('Dice')
+    plt.xlabel('Cutoff Point')
+    plt.savefig(str(Path(out_path, 'cutoff.png')), bbox_inches='tight', format='png', dpi=200)
+
+
+
+    shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    return cutoff_pt, dice_all
 
 
 def eval_dice(gt, pred, cutoff):
@@ -151,7 +232,7 @@ def eval_dice(gt, pred, cutoff):
     dice.append(dice_coefficient_tf(gt, pred_bin))
 
 
-def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, cutoff_pts=np.arange(0.2, 0.8, 0.025), preprocessor=None, mc_iterations=20, uncert_threshold=None):
+def get_cutoff_point_(model, val_path, out_path, batch_size=16, patch_size=256, cutoff_pts=np.arange(0.2, 0.8, 0.025), preprocessor=None, mc_iterations=20, uncert_threshold=None):
     tmp_dir = Path(out_path, 'cutoff_tmp', patches_only=False)
 
     index_data = process_imgs(Path(val_path, 'images'), Path(tmp_dir, 'images'), patch_size=patch_size, preprocessor=preprocessor)
@@ -162,12 +243,13 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, c
         img_generator = imgGenerator(batch_size, tmp_dir, 'images', target_size=(patch_size, patch_size), shuffle=False)
     max_steps = np.ceil(len(list(Path(tmp_dir, 'images').glob("*.png"))) / batch_size)
     results = model.predict(img_generator, steps=max_steps)
-    if mc_iterations:
+    if 'bayes' in model.name and mc_iterations:
         for iter in range(1,mc_iterations):
             results += model.predict(img_generator, steps=max_steps)
         results /= mc_iterations
     results = results.squeeze()
-    #np.save('cache.npy', results)
+    np.save('cache.npy', results)
+    results = np.load('cache.npy')
 
     p = Pool()
     dice_all = np.zeros(len(cutoff_pts))
@@ -201,6 +283,7 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, c
 
     cutoff_pts_list = np.array(cutoff_pts)
     dice_all = np.array(dice_all) / len(index_data)
+    print(dice_all)
     argmax = np.argmax(dice_all)
     cutoff_pt = cutoff_pts_list[argmax]
     max_dice = dice_all[argmax]
@@ -218,7 +301,7 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, c
 
 
 
-    shutil.rmtree(tmp_dir, ignore_errors=True)
+    #shutil.rmtree(tmp_dir, ignore_errors=True)
 
     return cutoff_pt, dice_all
 
@@ -239,10 +322,9 @@ def predict_patches_only(model, img_path, out_path, uncert_path, uncert_threshol
             else:
                 uncert = io.imread(Path(uncert_path, filename.stem + '.png'), as_gray=True)
 
+            uncert = uncert / 65535
             if uncert_threshold is not None:
                 uncert = (uncert >= uncert_threshold).astype(float)
-            else:
-                uncert = uncert / 65535
             img = np.stack((img, uncert), axis=-1)
         if preprocessor is not None:
             img = preprocessor.process(img)
@@ -296,6 +378,7 @@ if __name__ == '__main__':
     parser.add_argument('--img_path', type=str, help='Path containing images to be segmented')
     parser.add_argument('--out_path', type=str, help='output path for predictions')
     parser.add_argument('--uncert_path', type=str, help='Path containing uncertainty images')
+    parser.add_argument('--uncert_threshold', type=float, help='Threshold for uncertainty binarisation')
     parser.add_argument('--gt_path', type=str, help='Path containing the ground truth, necessary for evaluation_scripts')
     parser.add_argument('--batch_size', default=1, type=int, help='batch size (integer value)')
     parser.add_argument('--cutoff', type=float, help='cutoff point of binarisation')
@@ -310,6 +393,8 @@ if __name__ == '__main__':
         if not Path(args.gt_path).exists():
             print(args.gt_path + " does not exist")
     if args.uncert_path:
+        if not Path(args.uncert_path).exists():
+            print(args.uncert_path + " does not exist")
         uncert_path = Path(args.uncert_path)
     else:
         uncert_path = None
@@ -354,11 +439,32 @@ if __name__ == '__main__':
     if 'bayes' in model_name:
         print("Bayes")
         if args.patches_only:
-            predict_patches_only(model, args.img_path, out_path, uncert_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
+            predict_patches_only(model,
+                                 args.img_path,
+                                 out_path, uncert_path,
+                                 batch_size=args.batch_size,
+                                 patch_size=options['patch_size'],
+                                 cutoff=cutoff,
+                                 preprocessor=preprocessor,
+                                 uncert_threshold=args.uncert_threshold)
         else:
-            predict_bayes(model, args.img_path, out_path, uncert_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
+            predict_bayes(model,
+                          args.img_path,
+                          out_path,
+                          uncert_path,
+                          batch_size=args.batch_size,
+                          patch_size=options['patch_size'],
+                          cutoff=cutoff,
+                          preprocessor=preprocessor,
+                          uncert_threshold=args.uncert_threshold)
     else:
-        predict(model, args.img_path, out_path,uncert_path, batch_size=args.batch_size, patch_size=options['patch_size'], cutoff=cutoff, preprocessor=preprocessor)
+        predict(model,
+                args.img_path,
+                out_path,uncert_path,
+                batch_size=args.batch_size,
+                patch_size=options['patch_size'],
+                cutoff=cutoff,
+                preprocessor=preprocessor)
 
     if args.gt_path:
         evaluate(args.gt_path, out_path)

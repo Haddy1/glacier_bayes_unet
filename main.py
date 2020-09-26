@@ -63,7 +63,7 @@ if __name__ == '__main__':
     parser.add_argument('--evaluate', type=int, default=1, help='Evaluate prediction')
     parser.add_argument('--mc_iterations', type=int, default=20, help='Nr Monte Carlo Iterations for Bayes model')
     parser.add_argument('--secondStage', type=int, default=0, help='Second Stage training')
-    parser.add_argument('--uncert_threshold', type=int, default=None, help='Nr Monte Carlo Iterations for Bayes model')
+    parser.add_argument('--uncert_threshold', type=float, default=None, help='Threshold for uncertainty binarisation')
 
     # parser.add_argument('--Random_Seed', default=1, type=int, help='random seed number value (any integer value)')
 
@@ -124,6 +124,11 @@ if __name__ == '__main__':
     with open(Path(out_path, 'options.json'), 'w') as f:
         f.write(json.dumps(vars(args)))
 
+    if args.secondStage:
+        uncert_threshold = args.uncert_threshold
+    else:
+        uncert_threshold = None
+
     # Preprocessing
     preprocessor = Preprocessor()
     if args.denoise:
@@ -161,7 +166,7 @@ if __name__ == '__main__':
                                          image_folder='images',
                                          mask_folder='masks',
                                          uncertainty_folder='uncertainty',
-                                         uncert_threshold=args.uncert_threshold,
+                                         uncert_threshold=uncert_threshold,
                                          aug_dict=None,
                                          save_to_dir=None)
         val_Generator = trainGeneratorUncertainty(batch_size=batch_size,
@@ -169,7 +174,7 @@ if __name__ == '__main__':
                                                 image_folder='images',
                                                 mask_folder='masks',
                                                 uncertainty_folder='uncertainty',
-                                                uncert_threshold=args.uncert_threshold,
+                                                uncert_threshold=uncert_threshold,
                                                 aug_dict=None,
                                                 save_to_dir=None)
     else:
@@ -295,15 +300,12 @@ if __name__ == '__main__':
     print("Finding optimal cutoff point")
     img_generator = imgGenerator(args.batch_size, patches_path_val, 'images')
     mask_generator = imgGenerator(args.batch_size, patches_path_val, 'masks')
-    if 'bayes' in model.name:
-        cutoff, _ = get_cutoff_point(model,
-                                  val_path,
-                                  out_path=out_path,
-                                  batch_size=batch_size,
-                                  mc_iterations=args.mc_iterations)
-    else:
-        cutoff, _ = get_cutoff_point(model, val_path, out_path=out_path, batch_size=batch_size, mc_iterations=args.mc_iterations)
-    cutoff = 0.5
+    cutoff, _ = get_cutoff_point(model,
+                              val_path,
+                              out_path=out_path,
+                              batch_size=batch_size,
+                              mc_iterations=args.mc_iterations,
+                              uncert_threshold=uncert_threshold)
 
     # resave arguments including cutoff point
     with open(Path(out_path, 'options.json'), 'w') as f:
@@ -318,7 +320,7 @@ if __name__ == '__main__':
                               Path(test_path, 'images'),
                               out_path,
                               uncert_path=Path(test_path, 'uncertainty'),
-                              uncert_threshold=args.uncert_threshold,
+                              uncert_threshold=uncert_threshold,
                               batch_size=batch_size,
                               patch_size=patch_size,
                               preprocessor=preprocessor,
@@ -339,7 +341,7 @@ if __name__ == '__main__':
                         Path(test_path, 'images'),
                         out_path,
                         uncert_path=Path(test_path, 'uncertainty') ,
-                        uncert_threshold=args.uncert_threshold,
+                        uncert_threshold=uncert_threshold,
                         batch_size=batch_size,
                         patch_size=patch_size,
                         preprocessor=preprocessor,
