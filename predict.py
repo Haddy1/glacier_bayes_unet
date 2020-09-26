@@ -203,7 +203,7 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, c
 
 
     cutoff_pts_list = np.array(cutoff_pts)
-    dice_all = np.array(dice_all) / len(n_img)
+    dice_all = np.array(dice_all) / n_img
     argmax = np.argmax(dice_all)
     cutoff_pt = cutoff_pts_list[argmax]
     max_dice = dice_all[argmax]
@@ -218,10 +218,6 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, c
     plt.ylabel('Dice')
     plt.xlabel('Cutoff Point')
     plt.savefig(str(Path(out_path, 'cutoff.png')), bbox_inches='tight', format='png', dpi=200)
-
-
-
-    shutil.rmtree(tmp_dir, ignore_errors=True)
 
     return cutoff_pt, dice_all
 
