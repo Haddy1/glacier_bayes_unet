@@ -323,11 +323,11 @@ if __name__ == "__main__":
 
     #data_dir = Path('/disks/data1/oc39otib/glacier-front-detection/datasets/front_detection_dataset')
     data_dir = Path('datasets/front_detection_dataset')
-    out_dir = Path('datasets/front_detection_dataset_norm_val')
+    out_dir = Path('datasets/front_detection_dataset_frontonly')
 
-    #generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=True, uncert_minmax=True, front_zone_only=True)
-    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=False, uncert_minmax=True, front_zone_only=False, split=4)
-    #generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=False, uncert_minmax=True, front_zone_only=True)
+    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=True, front_zone_only=True, preprocessor=preprocessing.flip)
+    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=True, front_zone_only=True, preprocessor=preprocessing.flip)
+    generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=True, front_zone_only=True, preprocessor=preprocessing.flip)
     #generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=True)
     #generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=True)
     #generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=True)

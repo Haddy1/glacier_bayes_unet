@@ -147,11 +147,20 @@ def predict_bayes(model, img_path, out_path, uncert_path=None, uncert_threshold=
 def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, cutoff_pts=np.arange(0.2, 0.8, 0.025), preprocessor=None, mc_iterations=20, uncert_threshold=None):
     if not Path(out_path).exists():
         Path(out_path).mkdir(parents=True)
-    img_path = Path(val_path, 'images')
-    uncert_path = Path(val_path, 'uncertainty')
-    gt_path = Path(val_path, 'masks')
+
+    if not Path(val_path, 'images').exists() or len(list(Path(val_path, 'images').rglob('*.png'))) ==0:
+        img_path = Path(val_path, 'patches/images')
+        gt_path = Path(val_path, 'patches/masks')
+        n_img = len(list(Path(img_path).rglob('*.png')))
+        if n_img == 0:
+            raise FileNotFoundError("No images found in " + val_path)
+    else:
+        img_path = Path(val_path, 'images')
+        gt_path = Path(val_path, 'masks')
+        n_img = len(list(Path(img_path).rglob('*.png')))
+
     dice_all = np.zeros(len(cutoff_pts))
-    n_img = len(list(Path(img_path).rglob('*.png')))
+    uncert_path = Path(val_path, 'uncertainty')
     p = Pool()
     for filename in Path(img_path).rglob('*.png'):
         img = io.imread(filename, as_gray=True)
@@ -193,7 +202,10 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, c
 
         pred_flat = mask_predicted.flatten()
 
-        gt_img = io.imread(Path(gt_path, filename.stem + '_zones.png'))
+        if Path(gt_path, filename.stem + '_zones.png').exists():
+            gt_img = io.imread(Path(gt_path, filename.stem + '_zones.png'), as_gray=True)
+        else:
+            gt_img = io.imread(Path(gt_path, filename.stem + '.png'), as_gray=True)
         gt = (gt_img > 200).astype(int)
         gt_flat = gt.flatten()
         dice_eval = partial(dice_coefficient_cutoff, gt_flat, pred_flat)
@@ -201,7 +213,7 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, c
 
 
 
-
+    print(n_img)
     cutoff_pts_list = np.array(cutoff_pts)
     dice_all = np.array(dice_all) / n_img
     argmax = np.argmax(dice_all)
