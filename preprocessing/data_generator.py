@@ -255,6 +255,50 @@ def generate_subset(data_dir, out_dir, split=None, patch_size=256, preprocessor=
                      border=border,
                      uncert_minmax=uncert_minmax)
 
+def augment_patches(data_dir, out_dir, augment=None, split=None):
+    img_dir = Path(data_dir, "patches/images")
+    mask_dir = Path(data_dir, "patches/masks")
+    uncert_dir = Path(data_dir, "patches/uncertainty")
+    files_img = list(img_dir.glob('*.png'))
+
+    if split is not None:
+        if split < 1:
+            img_subset = random.sample(files_img, int(split * len(files_img)))
+        else:
+            img_subset = random.sample(files_img, split)
+    else:
+        img_subset = files_img
+
+    for f in img_subset:
+            basename = f.stem
+            img = cv2.imread(str(f), cv2.IMREAD_GRAYSCALE)
+            if preprocessor is not None:
+                img = preprocessor.process(img)
+            mask_zones = cv2.imread(str(Path(mask_dir, basename + '_zones.png')), cv2.IMREAD_GRAYSCALE)
+            if Path(uncert_dir).exists():
+                uncertainty = cv2.imread(str(Path(uncert_dir, basename + '_uncertainty.png')), cv2.IMREAD_GRAYSCALE)
+                if uncert_minmax:
+                    uncertainty = 65535 * (uncertainty - uncertainty.min()) / (uncertainty.max() - uncertainty.min())
+                    uncertainty = uncertainty.astype(np.uint16)
+            else:
+                uncertainty = None
+
+            if augment is not None:
+                imgs, augs = augment(img)
+                masks_zones, _ = augment(mask_zones)
+                uncertainties, _ = augment(uncertainty)
+            else:
+                imgs = [img]
+                masks_zones= [mask_zones]
+                uncertainties = [uncertainty]
+                augs = ['']
+
+            for img, uncertainty, mask_zones ,augmentation  in zip(imgs, uncertainties, masks_zones, augs):
+                cv2.imwrite(str(Path(out_dir, 'patches/images', basename + augmentation + '.png')), img)
+                cv2.imwrite(str(Path(out_dir, 'patches/masks', basename + augmentation + '_zones.png')), mask_zones)
+                cv2.imwrite(str(Path(out_dir, 'patches/uncertainty', basename + augmentation + '_uncertainty.png')), uncertainty)
+
+
 def generate_pix2pix_set(data_dir, out_dir, patch_size=256, front_zone_only=True, border='zeros', combine=True):
     process_data(data_dir, Path(out_dir), patch_size=patch_size, front_zone_only=front_zone_only, border=border, combine=combine)
 
@@ -323,11 +367,11 @@ if __name__ == "__main__":
 
     #data_dir = Path('/disks/data1/oc39otib/glacier-front-detection/datasets/front_detection_dataset')
     data_dir = Path('datasets/front_detection_dataset')
-    out_dir = Path('datasets/front_detection_dataset_frontonly')
+    out_dir = Path('datasets/front_detection_dataset_frontonly_flip')
 
-    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=True, front_zone_only=True, preprocessor=preprocessing.flip)
-    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=True, front_zone_only=True, preprocessor=preprocessing.flip)
-    generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=True, front_zone_only=True, preprocessor=preprocessing.flip)
+    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=True, front_zone_only=True, augment=augmentation.flip)
+    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=True, front_zone_only=True, augment=augmentation.flip)
+    generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=True, front_zone_only=True, augment=augmentation.flip)
     #generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=True)
     #generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=True)
     #generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=True)
