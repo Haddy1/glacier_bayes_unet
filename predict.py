@@ -26,7 +26,7 @@ from multiprocessing import Pool
 from functools import partial
 import shutil
 
-def predict(model, img_path, out_path, uncert_path=None, uncert_threshold=None, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None):
+def predict(model, img_path, out_path, uncert_path=None, uncert_threshold=None, batch_size=16, patch_size=256, cutoff=0.5, cutoff_front=0.5, preprocessor=None):
     if not Path(out_path).exists():
         Path(out_path).mkdir(parents=True)
 
@@ -71,9 +71,18 @@ def predict(model, img_path, out_path, uncert_path=None, uncert_threshold=None, 
             mask_predicted[mask_predicted >= cutoff] = 255
         else:
             mask_predicted = 255 * mask_predicted
-
-
         io.imsave(Path(out_path, filename.stem + '_pred.png'), mask_predicted.astype(np.uint8))
+
+        if front_predicted is not None:
+            if cutoff_front is not None:
+                # thresholding to make binary mask
+                front_predicted[front_predicted < cutoff_front] = 0
+                front_predicted[front_predicted >= cutoff_front] = 255
+            else:
+                front_predicted= 255 * front_predicted
+        io.imsave(Path(out_path, filename.stem + '_pred_front.png'), front_predicted.astype(np.uint8))
+
+
 
 def predict_bayes(model, img_path, out_path, uncert_path=None, uncert_threshold=None, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 20):
     if not Path(out_path).exists():
@@ -115,6 +124,12 @@ def predict_bayes(model, img_path, out_path, uncert_path=None, uncert_threshold=
 
         p_img_predicted = predictions.mean(axis=0)
         p_img_predicted = np.reshape(p_img_predicted,p_img_predicted.shape[:-1])
+        if len(predictions.shape) > 2 and predictions.shape[2] == 2:
+            front_predicted = reconstruct_from_grayscale_patches(p_img_predicted[:,:,:,1], i_img)[0]
+            front_predicted = front_predicted[:img.shape[0], :img.shape[1]]
+            p_img_predicted = p_img_predicted[:, :,:,0]
+        else:
+            front_predicted = None
         mask_predicted = reconstruct_from_grayscale_patches(p_img_predicted,i_img)[0]
         mask_predicted = mask_predicted[:img.shape[0], :img.shape[1]]
 
@@ -194,6 +209,10 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, c
             predictions.append(prediction)
         predictions = np.array(predictions)
 
+        # Dont use front prediction
+        if len(predictions.shape) > 3 and predictions.shape[3] == 2:
+            predictions = predictions[:,:,:,0]
+
 
         p_img_predicted = predictions.mean(axis=0)
         p_img_predicted = np.reshape(p_img_predicted,p_img_predicted.shape[:-1])
@@ -213,7 +232,6 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, c
 
 
 
-    print(n_img)
     cutoff_pts_list = np.array(cutoff_pts)
     dice_all = np.array(dice_all) / n_img
     argmax = np.argmax(dice_all)
@@ -391,6 +409,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', default=1, type=int, help='batch size (integer value)')
     parser.add_argument('--cutoff', type=float, help='cutoff point of binarisation')
     parser.add_argument('--patches_only', type=int, default=0)
+    parser.add_argument('--front_path', type=str, help='Path containing front line images')
     args = parser.parse_args()
 
     if not Path(args.model_path).exists():
@@ -406,6 +425,13 @@ if __name__ == '__main__':
         uncert_path = Path(args.uncert_path)
     else:
         uncert_path = None
+
+    if args.front_path:
+        if not Path(args.front_path).exists():
+            print(args.front_path + " does not exist")
+        front_path = Path(args.front_path)
+    else:
+        front_path = None
 
     model_path = Path(args.model_path)
     options = json.load(open(Path(model_path, 'options.json'), 'r'))

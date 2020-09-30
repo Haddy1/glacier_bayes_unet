@@ -79,8 +79,11 @@ def euclidian_tf(y_true, y_pred):
 
 def line_accuracy(y_true, y_pred):
     intersection = np.sum(y_true == y_pred)
-    union = np.sum(y_pred)
+    union = np.sum(y_true)
     if union == 0:
-        return 0
+        if intersection == 0:
+            return 1
+        else:
+            return 0
     else:
         return intersection / union

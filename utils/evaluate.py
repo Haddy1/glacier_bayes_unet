@@ -8,6 +8,15 @@ from utils import metrics
 import pandas as pd
 from matplotlib import pyplot as plt
 from multiprocessing import Pool
+def eval_front(gt_front_file, pred_front_file):
+    gt_img = io.imread(gt_front_file)
+    gt = (gt_img > 200).astype(int)
+    pred_img = io.imread(pred_front_file)
+    pred = (pred > 200).astype(int)
+    scores = {}
+    scores['line_accuracy'] = metrics.line_accuracy(gt_flat, pred_flat)
+    return scores
+
 def eval_img(gt_file, pred_file, img_name, uncertainty_file=None):
     gt_img = io.imread(gt_file, as_gray=True)
     gt = (gt_img > 200).astype(int)
@@ -22,7 +31,6 @@ def eval_img(gt_file, pred_file, img_name, uncertainty_file=None):
     scores['IOU'] = metrics.IOU(gt_flat, pred_flat)
     scores['specificity'] = metrics.specificity(gt_flat, pred_flat)
     scores['sensitivity'] = recall_score(gt_flat, pred_flat)
-    #scores['line_accuracy'] = metrics.line_accuracy(gt_flat, pred_flat)
     if uncertainty_file:
         uncertainty_img =  io.imread(uncertainty_file, as_gray=True)
         uncertainty = uncertainty_img / 65535
@@ -30,7 +38,7 @@ def eval_img(gt_file, pred_file, img_name, uncertainty_file=None):
     return scores
 
 
-def evaluate(gt_path, pred_path, out_path=None):
+def evaluate(gt_path, pred_path, gt_front_path=None, out_path=None):
     pred_path = Path(pred_path)
     gt_path = Path(gt_path)
     if not out_path:
@@ -39,6 +47,8 @@ def evaluate(gt_path, pred_path, out_path=None):
     pred_files =[]
     gt_files = []
     img_names = []
+    pred_front_files = []
+    gt_front_files = []
     uncertainty_files = []
     for f in gt_path.glob("*.png"):
         gt_files.append(str(f))
@@ -56,6 +66,12 @@ def evaluate(gt_path, pred_path, out_path=None):
         if Path(pred_path, basename + "_uncertainty.png").exists():
             uncertainty_files.append(str(Path(pred_path, basename + '_uncertainty.png')))
 
+        if gt_front_path is not None and Path(pred_path, basename + "_pred_front.png").exists():
+            pred_front_files.append(str(Path(pred_path, basename + '_pred_front.png')))
+            gt_front_files.append(str(Path(gt_front_path, basename + '_front.png')))
+
+    if len(pred_front_files) != len(gt_front_files):
+        raise AssertionError("Front Prediction and Front Ground truth set size does not match")
 
     if len(pred_files) != len(gt_files) != len(img_names):
         raise AssertionError("Prediction and Ground truth set size does not match")
@@ -70,6 +86,10 @@ def evaluate(gt_path, pred_path, out_path=None):
     else:
         set = zip(gt_files, pred_files, img_names)
     scores = p.starmap(eval_img, set)
+
+    if len(gt_front_files) > 0:
+        scores_front = p.starmap(eval_front, zip(gt_front_files, pred_front_files))
+        scores = {**scores, **scores_front}
     scores = pd.DataFrame(scores)
     scores.to_pickle(Path(out_path, 'scores.pkl'))
 
@@ -79,7 +99,14 @@ def evaluate(gt_path, pred_path, out_path=None):
             + str(np.mean(scores['IOU'])) + '\t'
             + str(np.mean(scores['euclidian'])) + '\t'
             + str(np.mean(scores['sensitivity'])) + '\t'
-            + str(np.mean(scores['specificity'])) + '\n')
+            + str(np.mean(scores['specificity'])))
+    if 'line_accuracy' in scores:
+        header += "\tline_accuracy"
+        report += '\t' + str(np.mean(scores['line_accuracy']))
+
+    report += '\n'
+
+
     print(header)
     print(report)
 

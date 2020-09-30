@@ -64,6 +64,7 @@ if __name__ == '__main__':
     parser.add_argument('--mc_iterations', type=int, default=20, help='Nr Monte Carlo Iterations for Bayes model')
     parser.add_argument('--secondStage', type=int, default=0, help='Second Stage training')
     parser.add_argument('--uncert_threshold', type=float, default=None, help='Threshold for uncertainty binarisation')
+    parser.add_argument('--front_prediction', type=bool, default=False, help='Train model to predict front line')
 
     # parser.add_argument('--Random_Seed', default=1, type=int, help='random seed number value (any integer value)')
 
@@ -161,36 +162,32 @@ if __name__ == '__main__':
     print(patches_path_train)
 
     if args.secondStage:
-        train_Generator = trainGeneratorUncertainty(batch_size=batch_size,
-                                         train_path=str(patches_path_train),
-                                         image_folder='images',
-                                         mask_folder='masks',
-                                         uncertainty_folder='uncertainty',
-                                         uncert_threshold=uncert_threshold,
-                                         aug_dict=None,
-                                         save_to_dir=None)
-        val_Generator = trainGeneratorUncertainty(batch_size=batch_size,
-                                                train_path=str(patches_path_val),
-                                                image_folder='images',
-                                                mask_folder='masks',
-                                                uncertainty_folder='uncertainty',
-                                                uncert_threshold=uncert_threshold,
-                                                aug_dict=None,
-                                                save_to_dir=None)
+        uncertainty_folder='uncertainty'
     else:
-        train_Generator = trainGenerator(batch_size=batch_size,
-                                         train_path=str(patches_path_train),
-                                         image_folder='images',
-                                         mask_folder='masks',
-                                         aug_dict=None,
-                                         save_to_dir=None)
+        uncertainty_folder=None
+    if args.front_prediction:
+        front_folder='lines'
+    else:
+        front_folder=None
 
-        val_Generator = trainGenerator(batch_size=batch_size,
-                                       train_path=str(patches_path_val),
-                                       image_folder='images',
-                                       mask_folder='masks',
-                                       aug_dict=None,
-                                       save_to_dir=None)
+    train_Generator = trainGeneratorUncertainty(batch_size=batch_size,
+                                     train_path=str(patches_path_train),
+                                     image_folder='images',
+                                     mask_folder='masks',
+                                     uncertainty_folder=uncertainty_folder,
+                                     front_folder=front_folder,
+                                     uncert_threshold=uncert_threshold,
+                                     aug_dict=None,
+                                     save_to_dir=None)
+    val_Generator = trainGeneratorUncertainty(batch_size=batch_size,
+                                            train_path=str(patches_path_val),
+                                            image_folder='images',
+                                            mask_folder='masks',
+                                            uncertainty_folder=uncertainty_folder,
+                                            front_folder=front_folder,
+                                            uncert_threshold=uncert_threshold,
+                                            aug_dict=None,
+                                            save_to_dir=None)
 
     loss_function = get_loss_function(args.loss, args.loss_parms)
 
