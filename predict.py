@@ -417,7 +417,7 @@ if __name__ == '__main__':
     parser.add_argument('--gt_path', type=str, help='Path containing the ground truth, necessary for evaluation_scripts')
     parser.add_argument('--batch_size', default=1, type=int, help='batch size (integer value)')
     parser.add_argument('--cutoff', type=float, help='cutoff point of binarisation')
-    parser.add_argument('--patches_only', type=int, default=0)
+    parser.add_argument('--patches_only', action='store_true')
     parser.add_argument('--front_path', type=str, help='Path containing front line images')
     args = parser.parse_args()
 

@@ -35,8 +35,8 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', default=-1, type=int, help='batch size (integer value), if -1 set batch size according to available gpu memery')
     parser.add_argument('--patch_size', default=256, type=int, help='size of the image patches (patch_size x patch_size')
 
-    parser.add_argument('--early_stopping', default=1, type=int,
-                        help='If 1, classifier is using early stopping based on val loss with patience 20 (0/1)')
+    parser.add_argument('--no_early_stopping', action='store_false',
+                        help='Dont Use Early Stopping')
     parser.add_argument("--loss", help="loss function for the deep classifiers training ",
                         choices=["binary_crossentropy", "focal_loss", "combined_loss"], default="binary_crossentropy")
     parser.add_argument('--loss_parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...",
@@ -48,8 +48,8 @@ if __name__ == '__main__':
                         choices=["none", "bilateral", "median", 'nlmeans', "enhanced_lee", "kuan"], default="None")
     parser.add_argument('--denoise_parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...",
                         help='dictionary with parameters for denoise filter')
-    parser.add_argument('--contrast', default=0, type=int, help='Contrast Enhancement')
-    parser.add_argument('--image_patches', default=0, type=int, help='Training data is already split into image patches')
+    parser.add_argument('--contrast', action='store_true', help='Contrast Enhancement')
+    parser.add_argument('--image_patches', action='store_true', help='Training data is already split into image patches')
 
     parser.add_argument('--out_path', type=str, help='Output path for results')
     parser.add_argument('--data_path', type=str, help='Path containing training and val data')
@@ -59,12 +59,12 @@ if __name__ == '__main__':
     parser.add_argument('--cyclic-parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...",
                         help='dictionary with parameters for cyclic learning')
     parser.add_argument('--learning_rate', type=float, default=1e-4, help='Initial learning rate')
-    parser.add_argument('--predict', type=int, default=1, help='Evaluate prediction')
-    parser.add_argument('--evaluate', type=int, default=1, help='Evaluate prediction')
+    parser.add_argument('--no_predict', action='store_false', help='Dont predict testset')
+    parser.add_argument('--no_evaluate', action='store_false', help='Dont evaluate')
     parser.add_argument('--mc_iterations', type=int, default=20, help='Nr Monte Carlo Iterations for Bayes model')
-    parser.add_argument('--secondStage', type=int, default=0, help='Second Stage training')
+    parser.add_argument('--secondStage', action='store_true', help='Second Stage training')
     parser.add_argument('--uncert_threshold', type=float, default=None, help='Threshold for uncertainty binarisation')
-    parser.add_argument('--front_prediction', type=bool, default=False, help='Train model to predict front line')
+    parser.add_argument('--front_prediction', action='store_true', help='Train model to predict front line')
 
     # parser.add_argument('--Random_Seed', default=1, type=int, help='random seed number value (any integer value)')
 
@@ -101,7 +101,7 @@ if __name__ == '__main__':
     if len(list(Path(val_path, 'images').glob("*.png"))) == 0:
         raise FileNotFoundError("No validation images were found")
 
-    if args.predict:
+    if not args.no_predict:
         test_path = Path(args.data_path, 'test')
         if not Path(test_path, 'images').exists():
             if Path(test_path,'patches/images').exists():
@@ -236,7 +236,7 @@ if __name__ == '__main__':
     print(num_val_samples)
 
 
-    if args.early_stopping:
+    if not args.no_early_stopping:
         callbacks.append(keras.callbacks.EarlyStopping('val_loss', patience=args.patience, verbose=0, mode='auto', restore_best_weights=True))
 
     if args.cyclic is not 'None':
@@ -311,7 +311,7 @@ if __name__ == '__main__':
         args.__dict__['cutoff'] = cutoff
         f.write(json.dumps(vars(args)))
 
-    if args.predict:
+    if not args.no_predict:
         test_path = str(Path(args.data_path, 'test'))
         if 'bayes' in model.name:
             if args.secondStage:
@@ -324,6 +324,7 @@ if __name__ == '__main__':
                               patch_size=patch_size,
                               preprocessor=preprocessor,
                               cutoff=cutoff,
+                              cutoff_front=cutoff,
                               mc_iterations=args.mc_iterations)
             else:
                 predict_bayes(model,
@@ -333,6 +334,7 @@ if __name__ == '__main__':
                               patch_size=patch_size,
                               preprocessor=preprocessor,
                               cutoff=cutoff,
+                              cutoff_front=cutoff,
                               mc_iterations=args.mc_iterations)
         else:
             if args.secondStage:
@@ -344,7 +346,8 @@ if __name__ == '__main__':
                         batch_size=batch_size,
                         patch_size=patch_size,
                         preprocessor=preprocessor,
-                        cutoff=cutoff)
+                        cutoff=cutoff,
+                        cutoff_front=cutoff)
             else:
                 predict(model,
                         Path(test_path, 'images'),
@@ -352,8 +355,9 @@ if __name__ == '__main__':
                         batch_size=batch_size,
                         patch_size=patch_size,
                         preprocessor=preprocessor,
-                        cutoff=cutoff)
-        if args.evaluate:
+                        cutoff=cutoff,
+                        cutoff_front=cutoff)
+        if not args.no_evaluate:
             if args.front_prediction:
                 evaluate.evaluate(Path(test_path, 'masks'), out_path, Path(test_path, 'lines'))
             else:
