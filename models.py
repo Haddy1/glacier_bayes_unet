@@ -127,7 +127,7 @@ def unet_Enze19(pretrained_weights = None,input_size = (256,256,1), loss_functio
     return model
 
 
-def unet_Enze19_2(pretrained_weights = None,input_size = (256,256,1), loss_function = binary_crossentropy):
+def unet_Enze19_2(pretrained_weights = None,input_size = (256,256,1), output_channels=1, loss_function = binary_crossentropy):
     # this model is based on the following paper by Enze Zhang et al.:
     # Automatically delineating the calving front of Jakobshavn Isbræ from multitemporal TerraSAR-X images: a deep learning approach
     inputs = Input(input_size)
@@ -214,7 +214,7 @@ def unet_Enze19_2(pretrained_weights = None,input_size = (256,256,1), loss_funct
     conv9 = LeakyReLU(alpha=.1)(conv9)
     conv9 = BatchNormalization()(conv9)
 
-    conv10 = Conv2D(1, 3, padding = 'same', activation = 'sigmoid')(conv9)
+    conv10 = Conv2D(output_channels, 3, padding = 'same', activation = 'sigmoid')(conv9)
 
     model = Model(inputs = inputs, outputs = conv10, name='unet_Enze19_2')
 

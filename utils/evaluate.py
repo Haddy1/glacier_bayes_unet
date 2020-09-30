@@ -11,8 +11,10 @@ from multiprocessing import Pool
 def eval_front(gt_front_file, pred_front_file):
     gt_img = io.imread(gt_front_file)
     gt = (gt_img > 200).astype(int)
+    gt_flat = gt.flatten()
     pred_img = io.imread(pred_front_file)
-    pred = (pred > 200).astype(int)
+    pred = (pred_img > 200).astype(int)
+    pred_flat = pred.flatten()
     scores = {}
     scores['line_accuracy'] = metrics.line_accuracy(gt_flat, pred_flat)
     return scores
@@ -86,11 +88,14 @@ def evaluate(gt_path, pred_path, gt_front_path=None, out_path=None):
     else:
         set = zip(gt_files, pred_files, img_names)
     scores = p.starmap(eval_img, set)
+    scores = pd.DataFrame(scores)
 
     if len(gt_front_files) > 0:
         scores_front = p.starmap(eval_front, zip(gt_front_files, pred_front_files))
-        scores = {**scores, **scores_front}
-    scores = pd.DataFrame(scores)
+        scores_front = pd.DataFrame(scores_front)
+        scores = pd.concat((scores, scores_front), axis=1)
+
+
     scores.to_pickle(Path(out_path, 'scores.pkl'))
 
     # Create summary report

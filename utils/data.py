@@ -98,7 +98,7 @@ def trainGenerator(batch_size,train_path,image_folder,mask_folder, uncertainty_f
             save_prefix  = image_save_prefix,
             shuffle=shuffle,
             seed = seed)
-        if len(image_generator.filepaths) != len(front_folder.filepaths):
+        if len(image_generator.filepaths) != len(front_generator.filepaths):
             raise AssertionError("Different nr of input images and front images")
 
     if uncertainty_folder is None and front_folder is None:

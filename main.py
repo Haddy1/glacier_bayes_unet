@@ -15,7 +15,7 @@ from CLR.clr_callback import CyclicLR
 from layers.BayesDropout import  BayesDropout
 import pandas as pd
 
-from utils.data import trainGenerator, imgGenerator, trainGeneratorUncertainty
+from utils.data import trainGenerator, imgGenerator
 import models
 from utils import helper_functions
 from loss_functions import *
@@ -170,7 +170,7 @@ if __name__ == '__main__':
     else:
         front_folder=None
 
-    train_Generator = trainGeneratorUncertainty(batch_size=batch_size,
+    train_Generator = trainGenerator(batch_size=batch_size,
                                      train_path=str(patches_path_train),
                                      image_folder='images',
                                      mask_folder='masks',
@@ -179,7 +179,7 @@ if __name__ == '__main__':
                                      uncert_threshold=uncert_threshold,
                                      aug_dict=None,
                                      save_to_dir=None)
-    val_Generator = trainGeneratorUncertainty(batch_size=batch_size,
+    val_Generator = trainGenerator(batch_size=batch_size,
                                             train_path=str(patches_path_val),
                                             image_folder='images',
                                             mask_folder='masks',
@@ -199,22 +199,24 @@ if __name__ == '__main__':
         model = load_model(str(checkpoint_file.absolute()), custom_objects={'loss': loss_function, 'BayesDropout':BayesDropout})
     else:
         model_func = getattr(models, args.model)
-        if 'bayes' in args.model:
-            if args.secondStage:
-                model = model_func(loss_function=loss_function,
-                                   input_size=(patch_size, patch_size, 2),
-                                   drop_rate=args.drop_rate)
-            else:
-                model = model_func(loss_function=loss_function,
-                                   input_size=(patch_size, patch_size, 1),
-                                   drop_rate=args.drop_rate)
+
+        if args.secondStage:
+            input_size = (patch_size, patch_size, 2)
         else:
-            if args.secondStage:
-                model = model_func(loss_function=loss_function,
-                                   input_size=(patch_size, patch_size, 2))
-            else:
-                model = model_func(loss_function=loss_function,
-                                    input_size=(patch_size, patch_size, 1))
+            input_size = (patch_size, patch_size, 1)
+        if args.front_prediction:
+            output_channels = 2
+        else:
+            output_channels = 1
+        if 'bayes' in args.model:
+            model = model_func(loss_function=loss_function,
+                               input_size=input_size,
+                               output_channels=output_channels,
+                               drop_rate=args.drop_rate)
+        else:
+            model = model_func(loss_function=loss_function,
+                                input_size=input_size,
+                                output_channels=output_channels)
 
     callbacks = []
     callbacks.append(keras.callbacks.CSVLogger(str(Path(out_path, model.name + '_history.csv')), append=True))
@@ -352,7 +354,10 @@ if __name__ == '__main__':
                         preprocessor=preprocessor,
                         cutoff=cutoff)
         if args.evaluate:
-            evaluate.evaluate(Path(test_path, 'masks'), out_path)
+            if args.front_prediction:
+                evaluate.evaluate(Path(test_path, 'masks'), out_path, Path(test_path, 'lines'))
+            else:
+                evaluate.evaluate(Path(test_path, 'masks'), out_path)
 
     END = time.time()
     print('Execution Time: ', END - START)

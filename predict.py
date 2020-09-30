@@ -61,8 +61,12 @@ def predict(model, img_path, out_path, uncert_path=None, uncert_threshold=None, 
 
         p_img_predicted = model.predict(p_img, batch_size=batch_size)
 
-        p_img_predicted = np.reshape(p_img_predicted,p_img_predicted.shape[:-1])
-        mask_predicted = reconstruct_from_grayscale_patches(p_img_predicted,i_img)[0]
+        if p_img_predicted.shape[-1] == 2:
+            front_predicted = reconstruct_from_grayscale_patches(p_img_predicted[..., 1], i_img)[0]
+            front_predicted = front_predicted[:img.shape[0], :img.shape[1]]
+        else:
+            front_predicted = None
+        mask_predicted = reconstruct_from_grayscale_patches(p_img_predicted[..., 0],i_img)[0]
         mask_predicted = mask_predicted[:img.shape[0], :img.shape[1]]
 
         if cutoff is not None:
@@ -80,11 +84,11 @@ def predict(model, img_path, out_path, uncert_path=None, uncert_threshold=None, 
                 front_predicted[front_predicted >= cutoff_front] = 255
             else:
                 front_predicted= 255 * front_predicted
-        io.imsave(Path(out_path, filename.stem + '_pred_front.png'), front_predicted.astype(np.uint8))
+            io.imsave(Path(out_path, filename.stem + '_pred_front.png'), front_predicted.astype(np.uint8))
 
 
 
-def predict_bayes(model, img_path, out_path, uncert_path=None, uncert_threshold=None, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 20):
+def predict_bayes(model, img_path, out_path, uncert_path=None, uncert_threshold=None, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 20, cutoff_front=0.5):
     if not Path(out_path).exists():
         Path(out_path).mkdir(parents=True)
 
@@ -123,14 +127,13 @@ def predict_bayes(model, img_path, out_path, uncert_path=None, uncert_threshold=
 
 
         p_img_predicted = predictions.mean(axis=0)
-        p_img_predicted = np.reshape(p_img_predicted,p_img_predicted.shape[:-1])
-        if len(predictions.shape) > 2 and predictions.shape[2] == 2:
+
+        if predictions.shape[-1] == 2:
             front_predicted = reconstruct_from_grayscale_patches(p_img_predicted[:,:,:,1], i_img)[0]
-            front_predicted = front_predicted[:img.shape[0], :img.shape[1]]
-            p_img_predicted = p_img_predicted[:, :,:,0]
         else:
             front_predicted = None
-        mask_predicted = reconstruct_from_grayscale_patches(p_img_predicted,i_img)[0]
+
+        mask_predicted = reconstruct_from_grayscale_patches(p_img_predicted[..., 0],i_img)[0]
         mask_predicted = mask_predicted[:img.shape[0], :img.shape[1]]
 
         mask_predicted_img = 65535 * mask_predicted
@@ -145,6 +148,15 @@ def predict_bayes(model, img_path, out_path, uncert_path=None, uncert_threshold=
 
         io.imsave(Path(out_path, filename.stem + '_pred.png'), mask_predicted.astype(np.uint8))
 
+        if front_predicted is not None:
+            if cutoff_front is not None:
+                # thresholding to make binary mask
+                front_predicted[front_predicted < cutoff_front] = 0
+                front_predicted[front_predicted >= cutoff_front] = 255
+            else:
+                front_predicted= 255 * front_predicted
+            io.imsave(Path(out_path, filename.stem + '_pred_front.png'), front_predicted.astype(np.uint8))
+
         p_uncertainty = predictions.var(axis=0)
         p_uncertainty = np.reshape(p_uncertainty,p_uncertainty.shape[:-1])
         uncertainty = reconstruct_from_grayscale_patches(p_uncertainty,i_img)[0]
@@ -157,9 +169,11 @@ def predict_bayes(model, img_path, out_path, uncert_path=None, uncert_threshold=
         if uncert_threshold is not None:
             confidence_img[uncertainty >= uncert_threshold, :] = np.array([255, 0,0])   # make  uncertain pixels red
         io.imsave(Path(out_path, filename.stem + '_confidence.png'), confidence_img)
-        #np.save(Path(out_path, filename.stem + '_uncertainty.npy'), uncertainty)
+
 
 def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, cutoff_pts=np.arange(0.2, 0.8, 0.025), preprocessor=None, mc_iterations=20, uncert_threshold=None):
+    if not 'bayes' in model.name:
+        mc_iterations = 1
     if not Path(out_path).exists():
         Path(out_path).mkdir(parents=True)
 
@@ -207,15 +221,10 @@ def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, c
         for i in range(mc_iterations):
             prediction = model.predict(p_img, batch_size=batch_size)
             predictions.append(prediction)
-        predictions = np.array(predictions)
-
-        # Dont use front prediction
-        if len(predictions.shape) > 3 and predictions.shape[3] == 2:
-            predictions = predictions[:,:,:,0]
-
+        # Only use mask channel
+        predictions = np.array(predictions)[..., 0]
 
         p_img_predicted = predictions.mean(axis=0)
-        p_img_predicted = np.reshape(p_img_predicted,p_img_predicted.shape[:-1])
         mask_predicted = reconstruct_from_grayscale_patches(p_img_predicted,i_img)[0]
         mask_predicted = mask_predicted[:img.shape[0], :img.shape[1]]
 
