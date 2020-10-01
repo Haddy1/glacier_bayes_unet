@@ -84,7 +84,7 @@ def predict(model, img_path, out_path, uncert_path=None, uncert_threshold=None, 
                 front_predicted[front_predicted >= cutoff_front] = 255
             else:
                 front_predicted= 255 * front_predicted
-            io.imsave(Path(out_path, filename.stem + '_pred_front.png'), front_predicted.astype(np.uint8))
+            io.imsave(Path(out_path, filename.stem + '_pred_front.png'), front_predicted.astype(np.uint8), check_contrast=False )
 
 
 
@@ -155,7 +155,7 @@ def predict_bayes(model, img_path, out_path, uncert_path=None, uncert_threshold=
                 front_predicted[front_predicted >= cutoff_front] = 255
             else:
                 front_predicted= 255 * front_predicted
-            io.imsave(Path(out_path, filename.stem + '_pred_front.png'), front_predicted.astype(np.uint8))
+            io.imsave(Path(out_path, filename.stem + '_pred_front.png'), front_predicted.astype(np.uint8), check_contrast=False )
 
         p_uncertainty = predictions.var(axis=0)
         p_uncertainty = np.reshape(p_uncertainty,p_uncertainty.shape[:-1])
