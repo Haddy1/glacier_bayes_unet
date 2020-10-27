@@ -35,7 +35,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', default=-1, type=int, help='batch size (integer value), if -1 set batch size according to available gpu memery')
     parser.add_argument('--patch_size', default=256, type=int, help='size of the image patches (patch_size x patch_size')
 
-    parser.add_argument('--no_early_stopping', action='store_false',
+    parser.add_argument('--no_early_stopping', action='store_true',
                         help='Dont Use Early Stopping')
     parser.add_argument("--loss", help="loss function for the deep classifiers training ",
                         choices=["binary_crossentropy", "focal_loss", "combined_loss"], default="binary_crossentropy")
@@ -59,8 +59,8 @@ if __name__ == '__main__':
     parser.add_argument('--cyclic-parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...",
                         help='dictionary with parameters for cyclic learning')
     parser.add_argument('--learning_rate', type=float, default=1e-4, help='Initial learning rate')
-    parser.add_argument('--no_predict', action='store_false', help='Dont predict testset')
-    parser.add_argument('--no_evaluate', action='store_false', help='Dont evaluate')
+    parser.add_argument('--no_predict', action='store_true', help='Dont predict testset')
+    parser.add_argument('--no_evaluate', action='store_true', help='Dont evaluate')
     parser.add_argument('--mc_iterations', type=int, default=20, help='Nr Monte Carlo Iterations for Bayes model')
     parser.add_argument('--secondStage', action='store_true', help='Second Stage training')
     parser.add_argument('--uncert_threshold', type=float, default=None, help='Threshold for uncertainty binarisation')

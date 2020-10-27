@@ -1,3 +1,7 @@
+from os.path import join, realpath, dirname
+import sys
+path = realpath(__file__)
+sys.path.append(join(dirname(path), "../"))
 import skimage.io as io
 from pathlib import Path
 import seaborn as sns
@@ -27,16 +31,20 @@ def eval_img(gt_file, pred_file, img_name, uncertainty_file=None):
     pred_flat = pred.flatten()
     gt_flat = gt.flatten()
     scores = {}
-    scores['image'] = img_name
-    scores['dice']= metrics.dice_coefficient(gt_flat, pred_flat)
-    scores['euclidian'] = distance.euclidean(gt_flat, pred_flat)
-    scores['IOU'] = metrics.IOU(gt_flat, pred_flat)
-    scores['specificity'] = metrics.specificity(gt_flat, pred_flat)
-    scores['sensitivity'] = recall_score(gt_flat, pred_flat)
-    if uncertainty_file:
-        uncertainty_img =  io.imread(uncertainty_file, as_gray=True)
-        uncertainty = uncertainty_img / 65535
-        scores['uncertainty'] = uncertainty.mean()
+    try:
+        scores['image'] = img_name
+        scores['dice']= metrics.dice_coefficient(gt_flat, pred_flat)
+        scores['euclidian'] = distance.euclidean(gt_flat, pred_flat)
+        scores['IOU'] = metrics.IOU(gt_flat, pred_flat)
+        scores['specificity'] = metrics.specificity(gt_flat, pred_flat)
+        scores['sensitivity'] = recall_score(gt_flat, pred_flat)
+        if uncertainty_file:
+            uncertainty_img =  io.imread(uncertainty_file, as_gray=True)
+            uncertainty = uncertainty_img / 65535
+            scores['uncertainty'] = uncertainty.mean()
+    except Exception as e:
+        raise type(e)(str(e) + " for img " + img_name)
+
     return scores
 
 
@@ -257,9 +265,9 @@ def eval_uncertainty(file, out_file, vmin=0, vmax=0.2):
     plt.savefig(out_file, bbox_inches='tight', format='png', dpi=200)
 
 if __name__ == '__main__':
-    path = Path('/home/andreas/glacier-front-detection/tmp')
+    path = Path('front1_bayes/')
 
-    test_path = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn/val')
+    test_path = Path('datasets/front_detection_dataset/test/')
     evaluate(Path(test_path, 'masks'), path)
     #test_path = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_front_only/test')
     #history = pickle.load(open(next(path.glob('history*.pkl')), 'rb'))
