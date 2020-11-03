@@ -133,9 +133,6 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
             uncertainty= uncertainty[:img.shape[0] // patch_size, :img.shape[1] // patch_size]
             front = front[:img.shape[0] // patch_size, :img.shape[1] // patch_size]
 
-        mask_zones[mask_zones == 127] = 0
-        mask_zones[mask_zones == 254] = 255
-
         if augment is not None:
             imgs, augs = augment(img)
             masks_zones, _ = augment(mask_zones)
@@ -159,7 +156,7 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
             if front_zone_only:
                 front_indices = []
                 for i in range(p_mask_zones.shape[0]):
-                    if 0 in p_mask_zones[i] and 255 in p_mask_zones[i]:
+                    if 0 in p_mask_zones[i] and 254 in p_mask_zones[i] or 0 in p_mask_zones[i] and 255 in p_mask_zones[i]:
                         front_indices.append(i)
                 front_indices = np.array(front_indices).astype(np.int)
                 p_mask_zones = p_mask_zones[front_indices]
@@ -300,9 +297,6 @@ def augment_patches(data_dir, out_dir, augment=None, split=None):
             mask_zones = cv2.imread(str(Path(mask_dir, basename + '_zones.png')), cv2.IMREAD_GRAYSCALE)
             if Path(uncert_dir).exists():
                 uncertainty = cv2.imread(str(Path(uncert_dir, basename + '_uncertainty.png')), cv2.IMREAD_GRAYSCALE)
-                if uncert_minmax:
-                    uncertainty = 65535 * (uncertainty - uncertainty.min()) / (uncertainty.max() - uncertainty.min())
-                    uncertainty = uncertainty.astype(np.uint16)
             else:
                 uncertainty = None
 
@@ -389,12 +383,12 @@ if __name__ == "__main__":
     preprocessor = preprocessor.Preprocessor()
 
     #data_dir = Path('/disks/data1/oc39otib/glacier-front-detection/datasets/front_detection_dataset')
-    data_dir = Path('datasets/front_detection_dataset')
-    out_dir = Path('datasets/front_detection_dataset')
+    data_dir = Path('/home/andreas/glacier-front-detection/datasets/front_detection_dataset')
+    out_dir = Path('datasets/debug')
 
-    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=True, augment=None)
-    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=True, front_zone_only=False, augment=None)
-    generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=True, front_zone_only=False, augment=None)
+    #generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=True, augment=None, split=5)
+    #generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=True, front_zone_only=False, augment=None, split=3)
+    generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=False, front_zone_only=False, augment=None, split=3)
     #generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=True, front_zone_only=True, augment=augmentation.flip)
     #generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=True, front_zone_only=True, augment=augmentation.flip)
     #generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=True)

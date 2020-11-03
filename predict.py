@@ -26,9 +26,11 @@ from multiprocessing import Pool
 from functools import partial
 import shutil
 
-def predict(model, img_path, out_path, uncert_path=None, uncert_threshold=None, batch_size=16, patch_size=256, cutoff=0.5, cutoff_front=0.5, preprocessor=None):
+def predict(model, img_path, out_path, uncert_path=None, uncert_threshold=None, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None):
     if not Path(out_path).exists():
         Path(out_path).mkdir(parents=True)
+
+    output_channels = model.output_shape[-1]
 
     for filename in Path(img_path).rglob('*.png'):
         print(filename)
@@ -60,16 +62,17 @@ def predict(model, img_path, out_path, uncert_path=None, uncert_threshold=None, 
             p_img = np.array([np.concatenate((img, uncert), axis=2) for img, uncert in zip(p_img, p_uncert)])
 
         p_img_predicted = model.predict(p_img, batch_size=batch_size)
-
-        if p_img_predicted.shape[-1] == 2:
-            front_predicted = reconstruct_from_grayscale_patches(p_img_predicted[..., 1], i_img)[0]
-            front_predicted = front_predicted[:img.shape[0], :img.shape[1]]
+        if output_channels > 1:
+            p_img_predicted = np.argmax(p_img_predicted, axis=-1)
         else:
-            front_predicted = None
-        mask_predicted = reconstruct_from_grayscale_patches(p_img_predicted[..., 0],i_img)[0]
+            p_img_predicted = p_img_predicted[..., 0]
+        mask_predicted = reconstruct_from_grayscale_patches(p_img_predicted,i_img)[0]
         mask_predicted = mask_predicted[:img.shape[0], :img.shape[1]]
 
-        if cutoff is not None:
+        if output_channels > 1:
+            mask_predicted = (255 // output_channels) * mask_predicted
+            mask_predicted[mask_predicted==254] = 255
+        elif cutoff is not None:
             # thresholding to make binary mask
             mask_predicted[mask_predicted < cutoff] = 0
             mask_predicted[mask_predicted >= cutoff] = 255
@@ -77,20 +80,13 @@ def predict(model, img_path, out_path, uncert_path=None, uncert_threshold=None, 
             mask_predicted = 255 * mask_predicted
         io.imsave(Path(out_path, filename.stem + '_pred.png'), mask_predicted.astype(np.uint8))
 
-        if front_predicted is not None:
-            if cutoff_front is not None:
-                # thresholding to make binary mask
-                front_predicted[front_predicted < cutoff_front] = 0
-                front_predicted[front_predicted >= cutoff_front] = 255
-            else:
-                front_predicted= 255 * front_predicted
-            io.imsave(Path(out_path, filename.stem + '_pred_front.png'), front_predicted.astype(np.uint8), check_contrast=False )
 
 
-
-def predict_bayes(model, img_path, out_path, uncert_path=None, uncert_threshold=None, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 20, cutoff_front=0.5):
+def predict_bayes(model, img_path, out_path, uncert_path=None, uncert_threshold=None, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 20, output_confidence= False):
     if not Path(out_path).exists():
         Path(out_path).mkdir(parents=True)
+
+    output_channels = model.output_shape[-1]
 
     for filename in Path(img_path).rglob('*.png'):
         #print(filename)
@@ -128,18 +124,21 @@ def predict_bayes(model, img_path, out_path, uncert_path=None, uncert_threshold=
 
         p_img_predicted = predictions.mean(axis=0)
 
-        if predictions.shape[-1] == 2:
-            front_predicted = reconstruct_from_grayscale_patches(p_img_predicted[:,:,:,1], i_img)[0]
+        if output_channels > 1:
+            p_img_predicted = np.argmax(p_img_predicted, axis=-1)
         else:
-            front_predicted = None
+            p_img_predicted = p_img_predicted[..., 0]
 
-        mask_predicted = reconstruct_from_grayscale_patches(p_img_predicted[..., 0],i_img)[0]
+
+        mask_predicted = reconstruct_from_grayscale_patches(p_img_predicted,i_img)[0]
         mask_predicted = mask_predicted[:img.shape[0], :img.shape[1]]
 
         mask_predicted_img = 65535 * mask_predicted
         io.imsave(Path(out_path, filename.stem + '_pred_perc.png'), mask_predicted_img.astype(np.uint16))
 
-        if cutoff is not None:
+        if output_channels > 1:
+            mask_predicted = (255 // output_channels) * mask_predicted
+        elif cutoff is not None:
             # thresholding to make binary mask
             mask_predicted[mask_predicted < cutoff] = 0
             mask_predicted[mask_predicted >= cutoff] = 255
@@ -148,27 +147,25 @@ def predict_bayes(model, img_path, out_path, uncert_path=None, uncert_threshold=
 
         io.imsave(Path(out_path, filename.stem + '_pred.png'), mask_predicted.astype(np.uint8))
 
-        if front_predicted is not None:
-            if cutoff_front is not None:
-                # thresholding to make binary mask
-                front_predicted[front_predicted < cutoff_front] = 0
-                front_predicted[front_predicted >= cutoff_front] = 255
-            else:
-                front_predicted= 255 * front_predicted
-            io.imsave(Path(out_path, filename.stem + '_pred_front.png'), front_predicted.astype(np.uint8), check_contrast=False )
 
         p_uncertainty = predictions.var(axis=0)
-        p_uncertainty = np.reshape(p_uncertainty,p_uncertainty.shape[:-1])
-        uncertainty = reconstruct_from_grayscale_patches(p_uncertainty,i_img)[0]
+        if output_channels > 1:
+            uncertainty = np.zeros(img.shape + (output_channels,))
+            for ch in range(output_channels):
+                uncertainty[:,:, ch] = reconstruct_from_grayscale_patches(p_uncertainty[...,ch],i_img)[0]
+        else:
+            uncertainty = reconstruct_from_grayscale_patches(p_uncertainty[..., 0],i_img)[0]
+
         uncertainty = uncertainty[:img.shape[0], :img.shape[1]]
         uncertainty_img = (65535 * uncertainty).astype(np.uint16)
         io.imsave(Path(out_path, filename.stem + '_uncertainty.png'), uncertainty_img, check_contrast=False )
 
-        confidence_img = mask_predicted[:,:,None] * np.ones((img.shape[0], img.shape[1], 3)) # broadcast to rgb img
-        confidence_img = confidence_img.astype(np.uint8)
-        if uncert_threshold is not None:
-            confidence_img[uncertainty >= uncert_threshold, :] = np.array([255, 0,0])   # make  uncertain pixels red
-        io.imsave(Path(out_path, filename.stem + '_confidence.png'), confidence_img)
+        if output_confidence:
+            confidence_img = mask_predicted[:,:,None] * np.ones((img.shape[0], img.shape[1], 3)) # broadcast to rgb img
+            confidence_img = confidence_img.astype(np.uint8)
+            if uncert_threshold is not None:
+                confidence_img[uncertainty >= uncert_threshold, :] = np.array([255, 0,0])   # make  uncertain pixels red
+            io.imsave(Path(out_path, filename.stem + '_confidence.png'), confidence_img)
 
 
 def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, cutoff_pts=np.arange(0.2, 0.8, 0.025), preprocessor=None, mc_iterations=20, uncert_threshold=None):
@@ -418,29 +415,24 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', default=1, type=int, help='batch size (integer value)')
     parser.add_argument('--cutoff', type=float, help='cutoff point of binarisation')
     parser.add_argument('--patches_only', action='store_true')
-    parser.add_argument('--front_path', type=str, help='Path containing front line images')
     args = parser.parse_args()
 
     if not Path(args.model_path).exists():
         print(args.model_path + " does not exist")
     if not Path(args.img_path).exists():
         print(args.img_path + " does not exist")
+        exit(-1)
     if args.gt_path:
         if not Path(args.gt_path).exists():
             print(args.gt_path + " does not exist")
+            exit(-1)
     if args.uncert_path:
         if not Path(args.uncert_path).exists():
             print(args.uncert_path + " does not exist")
+            exit(-1)
         uncert_path = Path(args.uncert_path)
     else:
         uncert_path = None
-
-    if args.front_path:
-        if not Path(args.front_path).exists():
-            print(args.front_path + " does not exist")
-        front_path = Path(args.front_path)
-    else:
-        front_path = None
 
     model_path = Path(args.model_path)
     options = json.load(open(Path(model_path, 'options.json'), 'r'))
@@ -464,12 +456,16 @@ if __name__ == '__main__':
     model_file = next(model_path.glob('model_*.h5'))
     model_name = model_file.name[6:-3]
     model = load_model(str(model_file.absolute()), custom_objects={ 'loss': loss_function, 'BayesDropout':BayesDropout})
+    multi_class = model.output_shape[-1] > 1
     print(model_name)
+
 
     if args.cutoff:
         cutoff = args.cutoff
     elif 'cutoff' in options:
         cutoff = options['cutoff']
+    elif multi_class:
+        cutoff = None
     else:
         cutoff = 0.5
 
@@ -510,5 +506,5 @@ if __name__ == '__main__':
                 preprocessor=preprocessor)
 
     if args.gt_path:
-        evaluate(args.gt_path, out_path)
+        evaluate(args.gt_path, out_path, multi_class=multi_class)
 

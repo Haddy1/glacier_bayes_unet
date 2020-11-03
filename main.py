@@ -64,7 +64,7 @@ if __name__ == '__main__':
     parser.add_argument('--mc_iterations', type=int, default=20, help='Nr Monte Carlo Iterations for Bayes model')
     parser.add_argument('--secondStage', action='store_true', help='Second Stage training')
     parser.add_argument('--uncert_threshold', type=float, default=None, help='Threshold for uncertainty binarisation')
-    parser.add_argument('--front_prediction', action='store_true', help='Train model to predict front line')
+    parser.add_argument('--multi_class', action='store_true', help='Use MultiClass Segmentation')
 
     # parser.add_argument('--Random_Seed', default=1, type=int, help='random seed number value (any integer value)')
 
@@ -165,17 +165,13 @@ if __name__ == '__main__':
         uncertainty_folder='uncertainty'
     else:
         uncertainty_folder=None
-    if args.front_prediction:
-        front_folder='lines'
-    else:
-        front_folder=None
 
     train_Generator = trainGenerator(batch_size=batch_size,
                                      train_path=str(patches_path_train),
                                      image_folder='images',
                                      mask_folder='masks',
                                      uncertainty_folder=uncertainty_folder,
-                                     front_folder=front_folder,
+                                     flag_multi_class=args.multi_class,
                                      uncert_threshold=uncert_threshold,
                                      aug_dict=None,
                                      save_to_dir=None)
@@ -184,7 +180,7 @@ if __name__ == '__main__':
                                             image_folder='images',
                                             mask_folder='masks',
                                             uncertainty_folder=uncertainty_folder,
-                                            front_folder=front_folder,
+                                            flag_multi_class=args.multi_class,
                                             uncert_threshold=uncert_threshold,
                                             aug_dict=None,
                                             save_to_dir=None)
@@ -204,8 +200,8 @@ if __name__ == '__main__':
             input_size = (patch_size, patch_size, 2)
         else:
             input_size = (patch_size, patch_size, 1)
-        if args.front_prediction:
-            output_channels = 2
+        if args.multi_class:
+            output_channels = 3
         else:
             output_channels = 1
         if 'bayes' in args.model:
@@ -296,20 +292,23 @@ if __name__ == '__main__':
         if Path(out_path, 'patches').exists():
             rmtree(Path(out_path, 'patches'))
 
-    print("Finding optimal cutoff point")
-    img_generator = imgGenerator(args.batch_size, patches_path_val, 'images')
-    mask_generator = imgGenerator(args.batch_size, patches_path_val, 'masks')
-    cutoff, _ = get_cutoff_point(model,
-                              val_path,
-                              out_path=out_path,
-                              batch_size=batch_size,
-                              mc_iterations=args.mc_iterations,
-                              uncert_threshold=uncert_threshold)
+    if not args.multi_class:
+        print("Finding optimal cutoff point")
+        img_generator = imgGenerator(args.batch_size, patches_path_val, 'images')
+        mask_generator = imgGenerator(args.batch_size, patches_path_val, 'masks')
+        cutoff, _ = get_cutoff_point(model,
+                                  val_path,
+                                  out_path=out_path,
+                                  batch_size=batch_size,
+                                  mc_iterations=args.mc_iterations,
+                                  uncert_threshold=uncert_threshold)
 
-    # resave arguments including cutoff point
-    with open(Path(out_path, 'options.json'), 'w') as f:
-        args.__dict__['cutoff'] = cutoff
-        f.write(json.dumps(vars(args)))
+        # resave arguments including cutoff point
+        with open(Path(out_path, 'options.json'), 'w') as f:
+            args.__dict__['cutoff'] = cutoff
+            f.write(json.dumps(vars(args)))
+    else:
+        cutoff = None
 
     if not args.no_predict:
         test_path = str(Path(args.data_path, 'test'))
@@ -324,7 +323,6 @@ if __name__ == '__main__':
                               patch_size=patch_size,
                               preprocessor=preprocessor,
                               cutoff=cutoff,
-                              cutoff_front=cutoff,
                               mc_iterations=args.mc_iterations)
             else:
                 predict_bayes(model,
@@ -334,7 +332,6 @@ if __name__ == '__main__':
                               patch_size=patch_size,
                               preprocessor=preprocessor,
                               cutoff=cutoff,
-                              cutoff_front=cutoff,
                               mc_iterations=args.mc_iterations)
         else:
             if args.secondStage:
@@ -346,8 +343,7 @@ if __name__ == '__main__':
                         batch_size=batch_size,
                         patch_size=patch_size,
                         preprocessor=preprocessor,
-                        cutoff=cutoff,
-                        cutoff_front=cutoff)
+                        cutoff=cutoff)
             else:
                 predict(model,
                         Path(test_path, 'images'),
@@ -355,8 +351,7 @@ if __name__ == '__main__':
                         batch_size=batch_size,
                         patch_size=patch_size,
                         preprocessor=preprocessor,
-                        cutoff=cutoff,
-                        cutoff_front=cutoff)
+                        cutoff=cutoff)
         if not args.no_evaluate:
             if args.front_prediction:
                 evaluate.evaluate(Path(test_path, 'masks'), out_path, Path(test_path, 'lines'))

@@ -5,6 +5,7 @@ import subprocess as sp
 from pathlib import Path
 import matplotlib
 import tensorflow as tf
+from scipy.spatial.distance import cdist
 
 def dice_coefficient_cutoff(gt, pred, cutoff):
     pred_bin = (pred >= cutoff).astype(int)
@@ -50,6 +51,8 @@ def dice_coefficient_tf(u,v):
         c_v = tf.reduce_sum(v**2)
     return 2 * c_uv / (c_u + c_v)
 
+
+
 def specificity(y_true, y_pred):
     neg_y_true = 1 - y_true
     neg_y_pred = 1 - y_pred
@@ -76,6 +79,18 @@ def IOU_tf(y_true, y_pred):
 
 def euclidian_tf(y_true, y_pred):
     return tf.reduce_sum((y_true - y_pred)**2)
+
+def line_graph(y_true, y_pred):
+    gt_line = np.where(y_true)
+    pred_line = np.where(y_pred)
+    gt_y_start = np.argmin(gt_line[0])
+    gt_start = (gt_y_start, np.argmin(gt_line[1][gt_y_start]))
+    gt_dist = cdist(gt_line, gt_line)
+
+
+
+
+
 
 def line_accuracy(y_true, y_pred):
     intersection = np.sum(y_true == y_pred)

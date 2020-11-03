@@ -10,31 +10,26 @@ from utils.helper_functions import nat_sort
 import cv2
 
 
-def adjustData(img,mask,flag_multi_class,num_class):
+def adjustData(img,mask,flag_multi_class):
+    img = img / 255
     if(flag_multi_class):
-        img = img / 255
         mask = mask[:,:,:,0] if(len(mask.shape) == 4) else mask[:,:,0]
-        new_mask = np.zeros(mask.shape + (num_class,))
-        for i in range(num_class):
-            #for one pixel in the image, find the class in mask and convert it into one-hot vector
-            #index = np.where(mask == i)
-            #index_mask = (index[0],index[1],index[2],np.zeros(len(index[0]),dtype = np.int64) + i) if (len(mask.shape) == 4) else (index[0],index[1],np.zeros(len(index[0]),dtype = np.int64) + i)
-            #new_mask[index_mask] = 1
-            new_mask[mask == i,i] = 1
-        new_mask = np.reshape(new_mask,(new_mask.shape[0],new_mask.shape[1]*new_mask.shape[2],new_mask.shape[3])) if flag_multi_class else np.reshape(new_mask,(new_mask.shape[0]*new_mask.shape[1],new_mask.shape[2]))
+        new_mask = np.zeros(mask.shape + (3,))
+
+        new_mask[mask == 0, 0] = 1
+        new_mask[mask == 127, 1] = 1
+        new_mask[mask == 254, 2] = 1
+        new_mask[mask == 255, 2] = 1
+
+
         mask = new_mask
-    elif(np.max(img) > 1):
-        img = img / 255
-        mask = mask / 255
-        mask[mask > 0.5] = 1
-        mask[mask <= 0.5] = 0
+    else:
+        mask = (mask > 127).astype(int)
     return (img,mask)
 
-
-
-def trainGenerator(batch_size,train_path,image_folder,mask_folder, uncertainty_folder=None, front_folder=None,aug_dict=None,image_color_mode = "grayscale",
+def trainGenerator(batch_size,train_path,image_folder, mask_folder, uncertainty_folder=None, front_folder=None,aug_dict=None,image_color_mode = "grayscale",
                     mask_color_mode = "grayscale",image_save_prefix  = "image",mask_save_prefix  = "mask",
-                    flag_multi_class = False,num_class = 2,save_to_dir = None,target_size = (256,256),seed = 1, shuffle=True, uncert_threshold=None):
+                    flag_multi_class = False,save_to_dir = None,target_size = (256,256),seed = 1, shuffle=True, uncert_threshold=None):
     '''
     can generate image and mask at the same time
     use the same seed for image_datagen and mask_datagen to ensure the transformation for image and mask is the same
@@ -86,55 +81,22 @@ def trainGenerator(batch_size,train_path,image_folder,mask_folder, uncertainty_f
             seed = seed)
         if len(image_generator.filepaths) != len(uncertainty_generator.filepaths):
             raise AssertionError("Different nr of input images and uncertainty images")
-    if front_folder is not None:
-        front_generator= image_datagen.flow_from_directory(
-            train_path,
-            classes = [front_folder],
-            class_mode = None,
-            color_mode = image_color_mode,
-            target_size = target_size,
-            batch_size = batch_size,
-            save_to_dir = save_to_dir,
-            save_prefix  = image_save_prefix,
-            shuffle=shuffle,
-            seed = seed)
-        if len(image_generator.filepaths) != len(front_generator.filepaths):
-            raise AssertionError("Different nr of input images and front images")
 
-    if uncertainty_folder is None and front_folder is None:
+    if uncertainty_folder is None:
         train_generator = zip(image_generator, mask_generator)
         for (img,mask) in train_generator:
-            img,mask = adjustData(img,mask,flag_multi_class,num_class)
+            img,mask = adjustData(img,mask,flag_multi_class)
             yield (img,mask)
-    elif uncertainty_folder is not None and front_folder is None:
+    else:
         train_generator = zip(image_generator, uncertainty_generator, mask_generator)
         for (img,uncertainty,mask) in train_generator:
             uncertainty = uncertainty / 65535
             if uncert_threshold is not None:
                 uncertainty[uncertainty >= uncert_threshold] = 1
                 uncertainty[uncertainty < uncert_threshold] = 0
-            img,mask = adjustData(img,mask,flag_multi_class,num_class)
+            img,mask = adjustData(img,mask,flag_multi_class)
             combined = np.concatenate((img, uncertainty), axis=3)
             yield (combined,mask)
-    elif uncertainty_folder is None and front_folder is not None:
-        train_generator = zip(image_generator, mask_generator, front_generator)
-        for (img,mask, front) in train_generator:
-            img,mask = adjustData(img,mask,flag_multi_class,num_class)
-            front = front /255
-            combined_out = np.concatenate((mask, front), axis=3)
-            yield (img, combined_out)
-    else:
-        train_generator = zip(image_generator, uncertainty_generator ,mask_generator, front_generator)
-        for (img,uncertainty,mask, front) in train_generator:
-            img,mask = adjustData(img,mask,flag_multi_class,num_class)
-            uncertainty = uncertainty / 65535
-            if uncert_threshold is not None:
-                uncertainty[uncertainty >= uncert_threshold] = 1
-                uncertainty[uncertainty < uncert_threshold] = 0
-            front = front /255
-            combined = np.concatenate((img, uncertainty), axis=3)
-            combined_out = np.concatenate((mask, front), axis=3)
-            yield (combined, combined_out)
 
 def trainGeneratorUncertainty(batch_size,train_path,image_folder,mask_folder, uncertainty_folder,aug_dict=None,image_color_mode = "grayscale",
                    mask_color_mode = "grayscale",image_save_prefix  = "image",mask_save_prefix  = "mask",

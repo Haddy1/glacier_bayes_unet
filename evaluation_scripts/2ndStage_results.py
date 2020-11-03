@@ -33,8 +33,8 @@ def plot_history(history, out_file, xlim=None, ylim=None, title=None):
     plt.savefig(out_file, bbox_inches='tight', format='png', dpi=200)
     plt.show()
 
-path = Path('/home/andreas/glacier-front-detection/output/2ndStage')
-out = Path('/home/andreas/thesis/reports/uncertainty_training')
+path = Path('/home/andreas/glacier-front-detection/output/2ndStage_threshold')
+out = Path('/home/andreas/thesis/reports/uncertainty_training_threshold05')
 test_path = Path('/home/andreas/glacier-front-detection/datasets/front_detection_dataset/test')
 if not out.exists():
     out.mkdir(parents=True)
@@ -60,12 +60,16 @@ for d in path.iterdir():
         copy(Path(d, basename + '_pred.png'), Path(out, 'imgs', identifier + "_" + basename + '_pred.png'))
         #copy(Path(path, i + '_diff.png'), Path(out, 'imgs', i + '_diff.png'))
 
-        uncert = io.imread(Path(d, basename + '_uncertainty.png'), as_gray=True)
-        uncert = (uncert - uncert.min()) / (uncert.max() - uncert.min())
-        io.imsave(Path(out, 'imgs', identifier + "_" + basename + '_uncertainty.png'), uncert)
-
-    history = pd.read_csv(next(d.glob('*history.csv')))
-    plot_history(history, Path(out, 'imgs', identifier + "_loss.png"), ylim=(0,0.8))
+        if Path(d, basename + '_uncertainty.png').exists():
+            uncert = io.imread(Path(d, basename + '_uncertainty.png'), as_gray=True)
+            uncert = (uncert - uncert.min()) / (uncert.max() - uncert.min())
+            io.imsave(Path(out, 'imgs', identifier + "_" + basename + '_uncertainty.png'), uncert)
+    try:
+        history = pd.read_csv(next(d.glob('*history.csv')))
+        plot_history(history, Path(out, 'imgs', identifier + "_loss.png"), ylim=(0,0.8))
+        copy(Path(d, 'cutoff.png'), Path(out, 'imgs', identifier + "_cutoff.png"))
+    except:
+        print("Not Found")
 
     scores = pd.read_pickle(Path(d, 'scores.pkl'))
     if 'uncertainty_var' in scores.columns:
@@ -170,15 +174,19 @@ with open(Path(out,'image_table.tex'), 'w') as f:
         identifier = d.name
 
         f.write("\\midrule\n")
-        f.write("\\multirow{3}{*}{\\shortstack[l]{ " +identifier.replace("_", " ").title() + "}} \n")
+        if Path(d, basename + '_uncertainty.png').exists():
+            f.write("\\multirow{3}{*}{\\shortstack[l]{ " +identifier.replace("_", " ").title() + "}} \n")
+        else:
+            f.write("\\shortstack[l]{ " + identifier.replace("_", " ").title() + "} \n")
         f.write("& Prediction\n")
         for basename in imgs:
             f.write("& " + graphicsline(identifier + "_" + basename + "_pred.png") + "\n")
         f.write("\\\\\n")
-        f.write("& Uncertainty")
-        for basename in imgs:
-            f.write("& " + graphicsline(identifier + "_" + basename + "_uncertainty.png") + "\n")
-        f.write("\\\\\n")
+        if Path(d, basename + '_uncertainty.png').exists():
+            f.write("& Uncertainty")
+            for basename in imgs:
+                f.write("& " + graphicsline(identifier + "_" + basename + "_uncertainty.png") + "\n")
+            f.write("\\\\\n")
     f.write("\\end{tabular}\n")
     f.write("\\endgroup\n")
 

@@ -46,9 +46,43 @@ def eval_img(gt_file, pred_file, img_name, uncertainty_file=None):
         raise type(e)(str(e) + " for img " + img_name)
 
     return scores
+def eval_img_multiclass(gt_file, pred_file, img_name, uncertainty_file=None):
+    gt_img = io.imread(gt_file, as_gray=True)
+    gt_img[gt_img == 254] = 255
+    pred_img = io.imread(pred_file, as_gray=True)
+
+    gt_water = (gt_img == 0).astype(int)
+    gt_rock = (gt_img == 127).astype(int)
+    gt_glacier = (gt_img > 200).astype(int)
+    pred_water = (pred_img == 0).astype(int)
+    pred_rock = (pred_img == 127).astype(int)
+    pred_glacier = (pred_img > 200).astype(int)
+    scores = {}
+    try:
+        dice_water = metrics.dice_coefficient(gt_water, pred_water)
+        dice_rock = metrics.dice_coefficient(gt_rock, pred_rock)
+        dice_glacier = metrics.dice_coefficient(gt_glacier, pred_glacier)
+        scores['Image'] = img_name
+        scores['Dice-Water']=  dice_water
+        scores['Dice-Rock']=  dice_rock
+        scores['Dice-Glacier']= dice_glacier
+        scores['Macro-Dice']= (dice_water + dice_rock + dice_glacier) / 3
+        scores['Weighted-Dice'] = (gt_water.sum() * dice_water + gt_rock.sum() * dice_rock + gt_glacier.sum() * dice_glacier) / (gt_img.shape[0] * gt_img.shape[1])
+        scores['Euclidian'] = distance.euclidean(gt_img.flatten(), pred_img.flatten())
+        scores['IOU'] = metrics.IOU(gt_img.flatten(), pred_img.flatten())
+        #scores['specificity'] = metrics.specificity(gt_flat, pred_flat)
+        #scores['sensitivity'] = recall_score(gt_flat, pred_flat)
+        #if uncertainty_file:
+        #    uncertainty_img =  io.imread(uncertainty_file, as_gray=True)
+        #    uncertainty = uncertainty_img / 65535
+        #    scores['uncertainty'] = uncertainty.mean()
+    except Exception as e:
+        raise type(e)(str(e) + " for img " + img_name)
+
+    return scores
 
 
-def evaluate(gt_path, pred_path, gt_front_path=None, out_path=None):
+def evaluate(gt_path, pred_path, gt_front_path=None, out_path=None, multi_class=False):
     pred_path = Path(pred_path)
     gt_path = Path(gt_path)
     if not out_path:
@@ -57,8 +91,6 @@ def evaluate(gt_path, pred_path, gt_front_path=None, out_path=None):
     pred_files =[]
     gt_files = []
     img_names = []
-    pred_front_files = []
-    gt_front_files = []
     uncertainty_files = []
     for f in gt_path.glob("*.png"):
         gt_files.append(str(f))
@@ -76,13 +108,6 @@ def evaluate(gt_path, pred_path, gt_front_path=None, out_path=None):
         if Path(pred_path, basename + "_uncertainty.png").exists():
             uncertainty_files.append(str(Path(pred_path, basename + '_uncertainty.png')))
 
-        if gt_front_path is not None and Path(pred_path, basename + "_pred_front.png").exists():
-            pred_front_files.append(str(Path(pred_path, basename + '_pred_front.png')))
-            gt_front_files.append(str(Path(gt_front_path, basename + '_front.png')))
-
-    if len(pred_front_files) != len(gt_front_files):
-        raise AssertionError("Front Prediction and Front Ground truth set size does not match")
-
     if len(pred_files) != len(gt_files) != len(img_names):
         raise AssertionError("Prediction and Ground truth set size does not match")
 
@@ -95,24 +120,33 @@ def evaluate(gt_path, pred_path, gt_front_path=None, out_path=None):
         set = zip(gt_files, pred_files, img_names, uncertainty_files)
     else:
         set = zip(gt_files, pred_files, img_names)
-    scores = p.starmap(eval_img, set)
+    if multi_class:
+        scores = p.starmap(eval_img_multiclass, set)
+    else:
+        scores = p.starmap(eval_img, set)
+
     scores = pd.DataFrame(scores)
-
-    if len(gt_front_files) > 0:
-        scores_front = p.starmap(eval_front, zip(gt_front_files, pred_front_files))
-        scores_front = pd.DataFrame(scores_front)
-        scores = pd.concat((scores, scores_front), axis=1)
-
 
     scores.to_pickle(Path(out_path, 'scores.pkl'))
 
     # Create summary report
-    header ='Dice\tIOU\tEucl\tSensitivity\tSpecificitiy'
-    report = (str(np.mean(scores['dice'])) + '\t'
-            + str(np.mean(scores['IOU'])) + '\t'
-            + str(np.mean(scores['euclidian'])) + '\t'
-            + str(np.mean(scores['sensitivity'])) + '\t'
-            + str(np.mean(scores['specificity'])))
+    if multi_class:
+        header ='Macro-Dice\tWeighted-Dice\tDice-Water\tDice-Rock\tDice-Glacier\tIOU\tEucl'
+        report = (
+                  str(np.mean(scores['Macro-Dice'])) + '\t'
+                  + str(np.mean(scores['Weighted-Dice'])) + '\t'
+                + str(np.mean(scores['Dice-Water'])) + '\t'
+                  + str(np.mean(scores['Dice-Rock'])) + '\t'
+                  + str(np.mean(scores['Dice-Glacier'])) + '\t'
+                  + str(np.mean(scores['IOU']))+ '\t'
+                  + str(np.mean(scores['Euclidian'])) )
+    else:
+        header ='Dice\tIOU\tEucl\tSensitivity\tSpecificitiy'
+        report = (str(np.mean(scores['dice'])) + '\t'
+                + str(np.mean(scores['IOU'])) + '\t'
+                + str(np.mean(scores['euclidian'])) + '\t'
+                + str(np.mean(scores['sensitivity'])) + '\t'
+                + str(np.mean(scores['specificity'])))
     if 'line_accuracy' in scores:
         header += "\tline_accuracy"
         report += '\t' + str(np.mean(scores['line_accuracy']))
