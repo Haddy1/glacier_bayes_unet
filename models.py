@@ -322,7 +322,8 @@ def unet_Enze19_2_bayes(pretrained_weights = None,input_size = (256,256,1), outp
     conv9 = LeakyReLU(alpha=.1)(conv9)
     conv9 = BatchNormalization()(conv9)
 
-    conv10 = Conv2D(output_channels, 3, padding = 'same', activation = 'sigmoid')(conv9)
+    drop10 = BayesDropout(rate=drop_rate, name='drop9')(conv9)
+    conv10 = Conv2D(output_channels, 3, padding = 'same', activation = 'sigmoid')(drop10)
 
     model = Model(inputs = inputs, outputs = conv10, name='unet_Enze19_bayes')
 
