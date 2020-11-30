@@ -34,14 +34,14 @@ def plot_history(history, out_file, xlim=None, ylim=None, title=None):
     plt.show()
 
 path = Path('/home/andreas/glacier-front-detection/output/2ndStage_threshold')
-out = Path('/home/andreas/thesis/reports/uncertainty_training_threshold05')
+out = Path('/home/andreas/thesis/glacier-paper')
 test_path = Path('/home/andreas/glacier-front-detection/datasets/front_detection_dataset/test')
 if not out.exists():
     out.mkdir(parents=True)
 if not Path(out, 'imgs').exists():
     Path(out, 'imgs').mkdir()
 
-imgs = ['1998-02-18_ERS_20_1', '2000-10-04_RSAT_20_4', '2006-10-18_ERS_20_4', '2009-12-03_PALSAR_20_5']
+imgs = ['1998-02-18_ERS_20_1', '2009-12-03_PALSAR_20_5', '2012-04-28_TDX_5_1']
 
 for basename in imgs:
     copy(Path(test_path, 'images', basename + '.png'), Path(out, 'imgs', basename + '.png'))
@@ -54,8 +54,7 @@ identifiers = []
 for d in path.iterdir():
     if not d.is_dir():
         continue
-    identifier = d.name.title()
-    #for i in ['2006-02-23_RSAT_20_3', '1993-08-29_ERS_20_5', '2011-09-21_TDX_5_1']:
+    identifier = d.name
     for basename in imgs:
         copy(Path(d, basename + '_pred.png'), Path(out, 'imgs', identifier + "_" + basename + '_pred.png'))
         #copy(Path(path, i + '_diff.png'), Path(out, 'imgs', i + '_diff.png'))
@@ -80,18 +79,18 @@ for d in path.iterdir():
         scores = scores.drop('line_accuracy', axis=1)
     score_frames.append(scores)
     identifier = d.name.replace("_", " ")
-    identifiers.append(identifier.title())
+    identifiers.append(identifier)
 
 all_scores= pd.concat(score_frames, keys=identifiers)
-
+columns = ['dice', 'IOU', 'uncertainty']
 with open(Path(out,'results_' + path.name + '.tex'), 'w') as f:
     line = "\\begin{tabular}{c c "
-    for _ in scores.columns:
+    for _ in columns:
         line += "c "
     line += "}\n"
     f.write(line)
     f.write("Method & Image")
-    for column in scores.columns:
+    for column in columns:
         if column == 'image':
             continue
         if column == 'euclidian':
@@ -116,7 +115,7 @@ with open(Path(out,'results_' + path.name + '.tex'), 'w') as f:
             line = "& " + string.ascii_uppercase[c]
             c += 1
             row = scores.loc[scores['image'] == img]
-            for column in row:
+            for column in columns:
                 if column == 'image':
                     continue
                 if column == 'euclidian':
@@ -129,7 +128,7 @@ with open(Path(out,'results_' + path.name + '.tex'), 'w') as f:
             line += " \\\\\n"
             f.write(line)
         line = "& Set"
-        for column in scores.columns:
+        for column in columns:
             if column == 'image':
                 continue
             if column == 'euclidian':

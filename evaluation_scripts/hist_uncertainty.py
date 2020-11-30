@@ -17,18 +17,18 @@ import utils.evaluate
 import math
 
 helper_functions.set_font_size()
-uncert_path = Path("datasets/front_detection_dataset/train/uncertainty")
+uncert_path = Path("/home/andreas/glacier-front-detection/datasets/front_detection_dataset/train/uncertainty")
 uncert = None
-#for f in uncert_path.glob("*.png"):
-#    if uncert is None:
-#        uncert = io.imread(f).flatten() / 65535
-#    else:
-#        uncert = np.concatenate((uncert, io.imread(f).flatten() / 65535), axis=0)
-#
-#
-#hist, edges = np.histogram(uncert)
-#np.save("hist.npy", (hist, edges))
-hist, edges = np.load("evaluation_scripts/hist.npy", allow_pickle=True)
+for f in uncert_path.glob("*.png"):
+    if uncert is None:
+        uncert = io.imread(f).flatten() / 65535
+    else:
+        uncert = np.concatenate((uncert, io.imread(f).flatten() / 65535), axis=0)
+
+
+hist, edges = np.histogram(uncert)
+np.save("hist.npy", (hist, edges))
+#hist, edges = np.load("evaluation_scripts/hist.npy", allow_pickle=True)
 fig, ax = plt.subplots()
 #uncert.sort()
 #print(int(math.ceil(0.9*len(uncert))))
