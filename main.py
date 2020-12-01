@@ -25,6 +25,7 @@ from preprocessing.preprocessor import Preprocessor
 from preprocessing import data_generator, filter
 from predict import predict, get_cutoff_point, predict_bayes
 from utils import  evaluate
+from train import train
 
 if __name__ == '__main__':
     # Hyper-parameter tuning
@@ -49,20 +50,17 @@ if __name__ == '__main__':
     parser.add_argument('--denoise_parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...",
                         help='dictionary with parameters for denoise filter')
     parser.add_argument('--contrast', action='store_true', help='Contrast Enhancement')
-    parser.add_argument('--image_patches', action='store_true', help='Training data is already split into image patches')
+    parser.add_argument('--patches_only', action='store_true', help='Training data is already split into image patches')
 
     parser.add_argument('--out_path', type=str, help='Output path for results')
     parser.add_argument('--data_path', type=str, help='Path containing training and val data')
     parser.add_argument('--model', default='unet_Enze19_2', type=str, help='Training Model to use - can be pretrained model')
     parser.add_argument('--drop_rate', default=0.5, type=float, help='Dropout for Bayesian Unet')
-    parser.add_argument('--cyclic', default='None', type=str, help='Which cyclic learning policy to use', choices=['None', 'triangular', 'triangular2', 'exp_range' ])
-    parser.add_argument('--cyclic-parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...",
-                        help='dictionary with parameters for cyclic learning')
     parser.add_argument('--learning_rate', type=float, default=1e-4, help='Initial learning rate')
     parser.add_argument('--no_predict', action='store_true', help='Dont predict testset')
     parser.add_argument('--no_evaluate', action='store_true', help='Dont evaluate')
     parser.add_argument('--mc_iterations', type=int, default=20, help='Nr Monte Carlo Iterations for Bayes model')
-    parser.add_argument('--secondStage', action='store_true', help='Second Stage training')
+    parser.add_argument('--second_stage', action='store_true', help='Second Stage training')
     parser.add_argument('--uncert_threshold', type=float, default=None, help='Threshold for uncertainty binarisation')
     parser.add_argument('--multi_class', action='store_true', help='Use MultiClass Segmentation')
 
@@ -125,7 +123,7 @@ if __name__ == '__main__':
     with open(Path(out_path, 'options.json'), 'w') as f:
         f.write(json.dumps(vars(args)))
 
-    if args.secondStage:
+    if args.second_stage:
         uncert_threshold = args.uncert_threshold
     else:
         uncert_threshold = None
@@ -139,181 +137,15 @@ if __name__ == '__main__':
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(25, 25))  # CLAHE adaptive contrast enhancement
         preprocessor.add_filter(clahe.apply)
 
-    patches_path_train = Path(args.data_path, 'train/patches')
-    if not patches_path_train.exists() or not Path(patches_path_train, 'image_list.json').exists() or len(json.load(open(Path(patches_path_train, 'image_list.json'), 'r')).keys()) == 0:
-        if args.image_patches:
-            patches_path_train = Path(args.data_path, 'train')
-        data_generator.process_data(Path(args.data_path, 'train'), Path(patches_path_train), patch_size=patch_size,
-                                        preprocessor=preprocessor)
-
-    patches_path_val = Path(args.data_path, 'val/patches')
-    if not patches_path_val.exists() or not Path(patches_path_val, 'image_list.json').exists() or len(json.load(open(Path(patches_path_val, 'image_list.json'), 'r')).keys()) == 0:
-        if args.image_patches:
-            patches_path_val = Path(args.data_path, 'val')
-        data_generator.process_data(Path(args.data_path, 'val'), Path(patches_path_val), patch_size=patch_size,
-                                        preprocessor=preprocessor)
-
-    # copy image file list to output
-    if Path(patches_path_train, 'image_list.json').exists():
-        copy(Path(patches_path_train, 'image_list.json'), Path(out_path, 'train_image_list.json'))
-    if Path(patches_path_val, 'image_list.json').exists():
-        copy(Path(patches_path_val, 'image_list.json'), Path(out_path, 'val_image_list.json'))
-
-    print(patches_path_train)
-
-    if args.secondStage:
-        uncertainty_folder='uncertainty'
-    else:
-        uncertainty_folder=None
-
-    train_Generator = trainGenerator(batch_size=batch_size,
-                                     train_path=str(patches_path_train),
-                                     image_folder='images',
-                                     mask_folder='masks',
-                                     uncertainty_folder=uncertainty_folder,
-                                     flag_multi_class=args.multi_class,
-                                     uncert_threshold=uncert_threshold,
-                                     aug_dict=None,
-                                     save_to_dir=None)
-    val_Generator = trainGenerator(batch_size=batch_size,
-                                            train_path=str(patches_path_val),
-                                            image_folder='images',
-                                            mask_folder='masks',
-                                            uncertainty_folder=uncertainty_folder,
-                                            flag_multi_class=args.multi_class,
-                                            uncert_threshold=uncert_threshold,
-                                            aug_dict=None,
-                                            save_to_dir=None)
-
     loss_function = get_loss_function(args.loss, args.loss_parms)
 
-    # Load pretrained model from file if it exists
-    if '.hdf5' in args.model or '.h5' in args.model:
-        model = load_model(args.model, custom_objects={'loss': loss_function, 'BayesDropout':BayesDropout})
-    elif Path(args.model).exists():
-        checkpoint_file = next(Path(args.model).glob('*.hdf5'))
-        model = load_model(str(checkpoint_file.absolute()), custom_objects={'loss': loss_function, 'BayesDropout':BayesDropout})
-    else:
-        model_func = getattr(models, args.model)
+    model, history, cutoff = train(args.model, train_path, val_path, out_path, args, loss_function=loss_function, preprocessor=preprocessor)
 
-        if args.secondStage:
-            input_size = (patch_size, patch_size, 2)
-        else:
-            input_size = (patch_size, patch_size, 1)
-        if args.multi_class:
-            output_channels = 3
-        else:
-            output_channels = 1
-        if 'bayes' in args.model:
-            model = model_func(loss_function=loss_function,
-                               input_size=input_size,
-                               output_channels=output_channels,
-                               drop_rate=args.drop_rate)
-        else:
-            model = model_func(loss_function=loss_function,
-                                input_size=input_size,
-                                output_channels=output_channels)
-
-    callbacks = []
-    callbacks.append(keras.callbacks.CSVLogger(str(Path(out_path, model.name + '_history.csv')), append=True))
-
-    model_checkpoint = keras.callbacks.ModelCheckpoint(str(Path(out_path, model.name + '_checkpoint.hdf5')),
-                                                       monitor='val_loss',
-                                                       verbose=0,
-                                                       save_best_only=True)
-    callbacks.append(model_checkpoint)
-    callbacks.append(keras.callbacks.TensorBoard(log_dir=str(Path(out_path, "logs/fit"))))
-
-    print(patches_path_train)
-    num_samples = len([file for file in Path(patches_path_train, 'images').rglob('*.png')])  # number of training samples
-    num_val_samples = len([file for file in Path(patches_path_val, 'images').rglob('*.png')])  # number of val samples
-
-    print(num_samples)
-    print(num_val_samples)
-
-
-    if not args.no_early_stopping:
-        callbacks.append(keras.callbacks.EarlyStopping('val_loss', patience=args.patience, verbose=0, mode='auto', restore_best_weights=True))
-
-    if args.cyclic is not 'None':
-        if args.cyclic_parms is not None:
-            cyclic_parms = args.cyclic_parms
-        else:
-            cyclic_parms = {}
-        if not 'base_lr' in cyclic_parms:
-            cyclic_parms['base_lr'] = 1e-4
-        if not 'max_lr' in cyclic_parms:
-            cyclic_parms['max_lr'] = 6e-4
-        if not 'step_size' in cyclic_parms:
-            cyclic_parms['step_size'] = int(4 * num_samples / batch_size)
-        clr = CyclicLR(mode=args.cyclic, base_lr=cyclic_parms['base_lr'], max_lr=cyclic_parms['max_lr'], step_size=cyclic_parms['step_size'])
-        callbacks.append(clr)
-        args.__dict__['cyclic_parms'] = cyclic_parms # save changes in options
-        # Update options file
-        with open(Path(out_path, 'options.json'), 'w') as f:
-            f.write(json.dumps(vars(args))) # Update options file
-
-
-
-    steps_per_epoch = np.ceil(num_samples / batch_size)
-    validation_steps = np.ceil(num_val_samples / batch_size)
-    model.fit_generator(train_Generator,
-                                  steps_per_epoch=steps_per_epoch,
-                                  epochs=args.epochs,
-                                  validation_data=val_Generator,
-                                  validation_steps=validation_steps,
-                                  callbacks=callbacks)
-
-    # # save model
-    model.save(str(Path(out_path, 'model_' + model.name + '.h5').absolute()))
-    ##########
-    ##########
-    # save loss plot
-
-    # Load history from file, in case of continued training it contains the history of previous training
-    history = pd.read_csv(Path(out_path, model.name + '_history.csv'))
-    plt.figure()
-    plt.rcParams.update({'font.size': 18})
-
-    plt.plot(history['epoch'], history['loss'], 'X-', label='training loss', linewidth=4.0)
-    plt.plot(history['epoch'], history['val_loss'], 'o-', label='val loss', linewidth=4.0)
-    plt.xlabel('epoch')
-    plt.ylabel('loss')
-    plt.legend(loc='upper right')
-    plt.minorticks_on()
-    plt.grid(which='minor', linestyle='--')
-    plt.savefig(str(Path(str(out_path), 'loss_plot.png')), bbox_inches='tight', format='png', dpi=200)
-    plt.show()
-
-    # Cleanup
-    if Path(out_path, 'model_' + model.name + '.h5').exists(): # Only cleanup if finished training model exists
-        if Path(out_path, model.name + '_checkpoint.hdf5').exists():
-            os.remove(Path(out_path, model.name + '_checkpoint.hdf5'))
-        if Path(out_path, 'patches').exists():
-            rmtree(Path(out_path, 'patches'))
-
-    if not args.multi_class:
-        print("Finding optimal cutoff point")
-        img_generator = imgGenerator(args.batch_size, patches_path_val, 'images')
-        mask_generator = imgGenerator(args.batch_size, patches_path_val, 'masks')
-        cutoff, _ = get_cutoff_point(model,
-                                  val_path,
-                                  out_path=out_path,
-                                  batch_size=batch_size,
-                                  mc_iterations=args.mc_iterations,
-                                  uncert_threshold=uncert_threshold)
-
-        # resave arguments including cutoff point
-        with open(Path(out_path, 'options.json'), 'w') as f:
-            args.__dict__['cutoff'] = cutoff
-            f.write(json.dumps(vars(args)))
-    else:
-        cutoff = None
 
     if not args.no_predict:
         test_path = str(Path(args.data_path, 'test'))
         if 'bayes' in model.name:
-            if args.secondStage:
+            if args.second_stage:
                 predict_bayes(model,
                               Path(test_path, 'images'),
                               out_path,
@@ -334,7 +166,7 @@ if __name__ == '__main__':
                               cutoff=cutoff,
                               mc_iterations=args.mc_iterations)
         else:
-            if args.secondStage:
+            if args.second_stage:
                 predict(model,
                         Path(test_path, 'images'),
                         out_path,
@@ -353,10 +185,7 @@ if __name__ == '__main__':
                         preprocessor=preprocessor,
                         cutoff=cutoff)
         if not args.no_evaluate:
-            if args.front_prediction:
-                evaluate.evaluate(Path(test_path, 'masks'), out_path, Path(test_path, 'lines'))
-            else:
-                evaluate.evaluate(Path(test_path, 'masks'), out_path)
+            evaluate.evaluate(Path(test_path, 'masks'), out_path)
 
     END = time.time()
     print('Execution Time: ', END - START)
