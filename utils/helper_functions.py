@@ -4,6 +4,8 @@ import subprocess as sp
 from pathlib import Path
 import matplotlib
 import re
+import errno
+import os
 
 def set_font_size(small=8, medium=10, bigger=12):
     matplotlib.rc('font', size=small)          # controls default text sizes
@@ -67,6 +69,25 @@ def nat_sort(l):
         return [ tryint(c) for c in re.split('([0-9]+)', s) ]
 
     l.sort(key=alphanum_key)
+
+
+def check_data_path(data_path):
+    # Check if input paths exist
+    if not Path(data_path).exists():
+        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), str(data_path))
+    elif not Path(data_path, 'images').exists():
+        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), str(Path(data_path,'images')))
+    elif not any(Path(data_path,'images').iterdir()):
+        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), str(Path(data_path, 'images') + " is empty"))
+    elif not Path(data_path, 'masks').exists():
+        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), str(Path(data_path,'masks')))
+    elif not any(Path(data_path,'masks').iterdir()):
+        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), str(Path(data_path, 'masks') + " is empty"))
+    else:
+        return True
+
+
+
 
 
 

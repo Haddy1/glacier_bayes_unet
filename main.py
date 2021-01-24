@@ -23,7 +23,7 @@ from tensorflow.keras.losses import *
 from shutil import copy, rmtree
 from preprocessing.preprocessor import Preprocessor
 from preprocessing import data_generator, filter
-from predict import predict, get_cutoff_point, predict_bayes
+from predict import predict, get_cutoff_point
 from utils import  evaluate
 from train import train
 
@@ -54,7 +54,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--out_path', type=str, help='Output path for results')
     parser.add_argument('--data_path', type=str, help='Path containing training and val data')
-    parser.add_argument('--model', default='unet_Enze19_2', type=str, help='Training Model to use - can be pretrained model')
+    parser.add_argument('--model', default='uncert_net', type=str, help='Training Model to use - can be pretrained model')
     parser.add_argument('--drop_rate', default=0.5, type=float, help='Dropout for Bayesian Unet')
     parser.add_argument('--learning_rate', type=float, default=1e-4, help='Initial learning rate')
     parser.add_argument('--no_predict', action='store_true', help='Dont predict testset')
@@ -83,7 +83,7 @@ if __name__ == '__main__':
 
     train_path = Path(args.data_path, 'train')
     if not Path(train_path, 'images').exists():
-        if Path(train_path,'patches/images').exists():
+        if Path(train_path,'patches/images').exists() and args.model != 'uncert_net':
             train_path = Path(train_path, 'patches')
         else:
             raise FileNotFoundError("training images Path not found")
@@ -139,53 +139,89 @@ if __name__ == '__main__':
 
     loss_function = get_loss_function(args.loss, args.loss_parms)
 
-    model, history, cutoff = train(args.model, train_path, val_path, out_path, args, loss_function=loss_function, preprocessor=preprocessor)
+    if 'bayes' in args.model or 'uncert' in args.model:
+        mc_iterations = args.mc_iterations
+    else:
+        mc_iterations = 1
 
+    if args.model == 'uncert_net':
+        #1st Stage
+        model_1st, history_1st, cutoff_1st = train('unet_bayes', train_path, val_path, Path(out_path, '1stStage'), args, loss_function=loss_function, preprocessor=preprocessor)
+        predict(model_1st,
+                Path(train_path, 'images'),
+                Path(out_path, '1stStage, train'),
+                batch_size=batch_size,
+                patch_size=patch_size,
+                preprocessor=preprocessor,
+                cutoff=cutoff_1st,
+                mc_iterations=args.mc_iterations)
+        predict(model_1st,
+                Path(train_path, 'images'),
+                Path(out_path, '1stStage, val'),
+                batch_size=batch_size,
+                patch_size=patch_size,
+                preprocessor=preprocessor,
+                cutoff=cutoff_1st,
+                mc_iterations=args.mc_iterations)
 
-    if not args.no_predict:
-        test_path = str(Path(args.data_path, 'test'))
-        if 'bayes' in model.name:
-            if args.second_stage:
-                predict_bayes(model,
-                              Path(test_path, 'images'),
-                              out_path,
-                              uncert_path=Path(test_path, 'uncertainty'),
-                              uncert_threshold=uncert_threshold,
-                              batch_size=batch_size,
-                              patch_size=patch_size,
-                              preprocessor=preprocessor,
-                              cutoff=cutoff,
-                              mc_iterations=args.mc_iterations)
-            else:
-                predict_bayes(model,
-                              Path(test_path, 'images'),
-                              out_path,
-                              batch_size=batch_size,
-                              patch_size=patch_size,
-                              preprocessor=preprocessor,
-                              cutoff=cutoff,
-                              mc_iterations=args.mc_iterations)
-        else:
-            if args.second_stage:
-                predict(model,
-                        Path(test_path, 'images'),
-                        out_path,
-                        uncert_path=Path(test_path, 'uncertainty') ,
-                        uncert_threshold=uncert_threshold,
-                        batch_size=batch_size,
-                        patch_size=patch_size,
-                        preprocessor=preprocessor,
-                        cutoff=cutoff)
-            else:
-                predict(model,
-                        Path(test_path, 'images'),
-                        out_path,
-                        batch_size=batch_size,
-                        patch_size=patch_size,
-                        preprocessor=preprocessor,
-                        cutoff=cutoff)
+        ##2ndStage
+        data_generator.process_imgs(Path(out_path,'1stStage/train/uncertainty'), Path(out_path, '1stStage/train/uncertainty/patches'))
+        data_generator.process_imgs(Path(out_path,'1stStage/val/uncertainty'), Path(out_path, '1stStage/val/uncertainty/patches'))
+
+        model, history, cutoff = train('unet_bayes', train_path, val_path, out_path, args,
+                                                   train_uncert_path=Path(out_path,'1stStage/train/uncertainty/patches'),
+                                                   val_uncert_path=Path(out_path, '1stStage/val/uncertainty/patches'),
+                                                   loss_function=loss_function, preprocessor=preprocessor)
+
+        # predict 1st Stage
+        if not args.no_predict:
+            predict(model_1st,
+                    Path(test_path, 'images'),
+                    Path(out_path, '1stStage'),
+                    batch_size=batch_size,
+                    patch_size=patch_size,
+                    preprocessor=preprocessor,
+                    cutoff=cutoff_1st,
+                    mc_iterations=args.mc_iterations)
         if not args.no_evaluate:
             evaluate.evaluate(Path(test_path, 'masks'), out_path)
+
+        # predict 2ndStage
+            predict(model,
+                    Path(test_path, 'images'),
+                    out_path,
+                    uncert_path=Path(out_path,'1stStage/uncertainty'),
+                    batch_size=batch_size,
+                    patch_size=patch_size,
+                    preprocessor=preprocessor,
+                    cutoff=cutoff,
+                    mc_iterations=args.mc_iterations)
+            if not args.no_evaluate:
+                evaluate.evaluate(Path(test_path, 'masks'), out_path)
+
+    # single stage mode
+    else:
+        model, history, cutoff = train(args.model, train_path, val_path, out_path, args, loss_function=loss_function, preprocessor=preprocessor)
+        if not args.no_predict:
+            if args.second_stage:
+                uncert_test_path = Path(test_path, 'uncertainty')
+            else:
+                uncert_test_path = None
+            predict(model,
+                    Path(test_path, 'images'),
+                    out_path,
+                    uncert_path=uncert_test_path,
+                    batch_size=batch_size,
+                    patch_size=patch_size,
+                    preprocessor=preprocessor,
+                    cutoff=cutoff,
+                    mc_iterations=args.mc_iterations)
+            evaluate.evaluate(Path(test_path, 'masks'), out_path)
+            if not args.no_evaluate:
+                evaluate.evaluate(Path(test_path, 'masks'), out_path)
+
+
+
 
     END = time.time()
     print('Execution Time: ', END - START)

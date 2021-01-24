@@ -68,11 +68,14 @@ def trainGenerator(batch_size,train_path,image_folder, mask_folder, uncertainty_
         raise AssertionError("Different nr of input images and mask images")
 
     if uncertainty_folder is not None:
+        if flag_multi_class:
+            color_mode = 'rgb'
+        else:
+            color_mode = 'grayscale'
         uncertainty_generator= image_datagen.flow_from_directory(
-            train_path,
-            classes = [uncertainty_folder],
+            uncertainty_folder,
             class_mode = None,
-            color_mode = image_color_mode,
+            color_mode = color_mode,
             target_size = target_size,
             batch_size = batch_size,
             save_to_dir = save_to_dir,
@@ -89,12 +92,12 @@ def trainGenerator(batch_size,train_path,image_folder, mask_folder, uncertainty_
             yield (img,mask)
     else:
         train_generator = zip(image_generator, uncertainty_generator, mask_generator)
-        for (img,uncertainty,mask) in train_generator:
+        for (img, uncertainty, mask) in train_generator:
             uncertainty = uncertainty / 65535
             if uncert_threshold is not None:
                 uncertainty[uncertainty >= uncert_threshold] = 1
                 uncertainty[uncertainty < uncert_threshold] = 0
-            img,mask = adjustData(img,mask,flag_multi_class)
+            img, mask = adjustData(img,mask,flag_multi_class)
             combined = np.concatenate((img, uncertainty), axis=3)
             yield (combined,mask)
 

@@ -126,11 +126,13 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
             img = cv2.copyMakeBorder(img, 0, (patch_size - img.shape[0]) % patch_size, 0, (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
             mask_zones = cv2.copyMakeBorder(mask_zones, 0, (patch_size - mask_zones.shape[0]) % patch_size, 0, (patch_size - mask_zones.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
             front = cv2.copyMakeBorder(front, 0, (patch_size - front.shape[0]) % patch_size, 0, (patch_size - front.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
-            uncertainty = cv2.copyMakeBorder(uncertainty, 0, (patch_size - uncertainty.shape[0]) % patch_size, 0, (patch_size - uncertainty.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
+            if uncertainty is not None:
+                uncertainty = cv2.copyMakeBorder(uncertainty, 0, (patch_size - uncertainty.shape[0]) % patch_size, 0, (patch_size - uncertainty.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
         if border == 'crop':
             img = img[:img.shape[0] // patch_size, :img.shape[1] // patch_size]
             mask_zones = masks_zones[:img.shape[0] // patch_size, :img.shape[1] // patch_size]
-            uncertainty= uncertainty[:img.shape[0] // patch_size, :img.shape[1] // patch_size]
+            if uncertainty is not None:
+                uncertainty= uncertainty[:img.shape[0] // patch_size, :img.shape[1] // patch_size]
             front = front[:img.shape[0] // patch_size, :img.shape[1] // patch_size]
 
         if augment is not None:
@@ -150,7 +152,8 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
 
             p_mask_zones, i_mask_zones = image_patches.extract_grayscale_patches(mask_zones, (patch_size, patch_size), stride = (patch_size, patch_size))
             p_img, i_img = image_patches.extract_grayscale_patches(img, (patch_size, patch_size), stride = (patch_size, patch_size))
-            p_uncert, i_uncert = image_patches.extract_grayscale_patches(uncertainty, (patch_size, patch_size), stride = (patch_size, patch_size))
+            if uncertainty is not None:
+                p_uncert, i_uncert = image_patches.extract_grayscale_patches(uncertainty, (patch_size, patch_size), stride = (patch_size, patch_size))
             p_front, i_front = image_patches.extract_grayscale_patches(front, (patch_size, patch_size), stride = (patch_size, patch_size))
 
             if front_zone_only:
@@ -161,7 +164,8 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
                 front_indices = np.array(front_indices).astype(np.int)
                 p_mask_zones = p_mask_zones[front_indices]
                 i_mask_zones = (i_mask_zones[0][front_indices], i_mask_zones[1][front_indices])
-                p_uncert = p_uncert[front_indices]
+                if uncertainty is not None:
+                    p_uncert = p_uncert[front_indices]
                 p_front = p_front[front_indices]
                 p_img = p_img[front_indices]
 
@@ -175,9 +179,9 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
                     else:
                         cv2.imwrite(str(Path(out_dir, 'images/'+str(patch_counter)+'.png')), p_img[j])
                         cv2.imwrite(str(Path(out_dir, 'masks/'+str(patch_counter)+'.png')), p_mask_zones[j])
-
-                    cv2.imwrite(str(Path(out_dir, 'uncertainty/'+str(patch_counter)+'.png')), p_uncert[j])
-                    cv2.imwrite(str(Path(out_dir, 'lines/'+str(patch_counter)+'.png')), p_uncert[j])
+                    cv2.imwrite(str(Path(out_dir, 'lines/'+str(patch_counter)+'.png')), p_front[j])
+                    if uncertainty is not None:
+                        cv2.imwrite(str(Path(out_dir, 'uncertainty/'+str(patch_counter)+'.png')), p_uncert[j])
 
                     patch_indices.append(patch_counter) # store patch nrs used for image
                     patch_counter += 1
@@ -261,8 +265,9 @@ def generate_subset(data_dir, out_dir, split=None, patch_size=256, preprocessor=
             for img, uncertainty, mask_zones ,augmentation, front  in zip(imgs, uncertainties, masks_zones, augs, fronts):
                 cv2.imwrite(str(Path(out_dir, 'images', basename + augmentation + '.png')), img)
                 cv2.imwrite(str(Path(out_dir, 'masks', basename + augmentation + '_zones.png')), mask_zones)
-                cv2.imwrite(str(Path(out_dir, 'uncertainty', basename + augmentation + '_uncertainty.png')), uncertainty)
                 cv2.imwrite(str(Path(out_dir, 'lines', basename + augmentation + '_front.png')), front)
+                if uncertainty is not None:
+                    cv2.imwrite(str(Path(out_dir, 'uncertainty', basename + augmentation + '_uncertainty.png')), uncertainty)
 
     if patch_size is not None:
         process_data(data_dir,
@@ -313,7 +318,8 @@ def augment_patches(data_dir, out_dir, augment=None, split=None):
             for img, uncertainty, mask_zones ,augmentation  in zip(imgs, uncertainties, masks_zones, augs):
                 cv2.imwrite(str(Path(out_dir, 'patches/images', basename + augmentation + '.png')), img)
                 cv2.imwrite(str(Path(out_dir, 'patches/masks', basename + augmentation + '_zones.png')), mask_zones)
-                cv2.imwrite(str(Path(out_dir, 'patches/uncertainty', basename + augmentation + '_uncertainty.png')), uncertainty)
+                if uncertainty is not None:
+                    cv2.imwrite(str(Path(out_dir, 'patches/uncertainty', basename + augmentation + '_uncertainty.png')), uncertainty)
 
 
 def generate_pix2pix_set(data_dir, out_dir, patch_size=256, front_zone_only=True, border='zeros', combine=True):
@@ -345,13 +351,15 @@ def split_set(data_dir, out_dir1, out_dir2, split):
         basename = f.stem
         copy(f, Path(out_dir1, 'images'))
         copy(Path(data_dir, 'masks', basename + '_zones.png'), Path(out_dir1, 'masks'))
-        copy(Path(data_dir, 'uncertainty', basename + '_uncertainty.png'), Path(out_dir1, 'uncertainty'))
+        if Path(data_dir, 'uncertainty').exists():
+            copy(Path(data_dir, 'uncertainty', basename + '_uncertainty.png'), Path(out_dir1, 'uncertainty'))
 
     for f in set2:
         basename = f.stem
         copy(f, Path(out_dir2, 'images'))
         copy(Path(data_dir, 'masks', basename + '_zones.png'), Path(out_dir2, 'masks'))
-        copy(Path(data_dir, 'uncertainty', basename + '_uncertainty.png'), Path(out_dir2, 'uncertainty'))
+        if Path(data_dir, 'uncertainty').exists():
+            copy(Path(data_dir, 'uncertainty', basename + '_uncertainty.png'), Path(out_dir2, 'uncertainty'))
 
 
 def bayes_train_gen(img_path, pred_path, out_path, uncertainty_threshold = 1e-3):
@@ -384,11 +392,11 @@ if __name__ == "__main__":
 
     #data_dir = Path('/disks/data1/oc39otib/glacier-front-detection/datasets/front_detection_dataset')
     data_dir = Path('/home/andreas/glacier-front-detection/datasets/front_detection_dataset')
-    out_dir = Path('datasets/debug')
+    out_dir = Path('../datasets/debug')
 
-    #generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=True, augment=None, split=5)
-    #generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=True, front_zone_only=False, augment=None, split=3)
-    generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=False, front_zone_only=False, augment=None, split=3)
+    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=False, augment=None, split=2)
+    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=False, front_zone_only=False, augment=None, split=1)
+    generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=False, front_zone_only=False, augment=None, split=1)
     #generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=True, front_zone_only=True, augment=augmentation.flip)
     #generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=True, front_zone_only=True, augment=augmentation.flip)
     #generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=True)

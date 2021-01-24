@@ -1,11 +1,6 @@
-import sys
 import json
-import seaborn as sns
-from pathlib import Path
 from tensorflow.keras.models import load_model
 from utils.data import *
-import tensorflow as tf
-import pickle
 import argparse
 from loss_functions import *
 from tensorflow.keras.losses import binary_crossentropy
@@ -24,65 +19,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from multiprocessing import Pool
 from functools import partial
-import shutil
 
-def predict(model, img_path, out_path, uncert_path=None, uncert_threshold=None, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None):
-    if not Path(out_path).exists():
-        Path(out_path).mkdir(parents=True)
-
-    output_channels = model.output_shape[-1]
-
-    for filename in Path(img_path).rglob('*.png'):
-        print(filename)
-        img = io.imread(filename, as_gray=True)
-        img = img / 255
-
-        if preprocessor is not None:
-            img = preprocessor.process(img)
-        img_pad = cv2.copyMakeBorder(img, 0, (patch_size - img.shape[0]) % patch_size, 0, (patch_size - img.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
-        p_img, i_img = extract_grayscale_patches(img_pad, (patch_size, patch_size), stride = (patch_size, patch_size))
-        p_img = np.reshape(p_img,p_img.shape+(1,))
-
-        if uncert_path is not None:
-            if Path(uncert_path, filename.stem + '_uncertainty.png').exists():
-                uncert = io.imread(Path(uncert_path, filename.stem + '_uncertainty.png'), as_gray=True)
-            else:
-                uncert = io.imread(Path(uncert_path, filename.stem + '.png'), as_gray=True)
-
-            if preprocessor is not None:
-                uncert = preprocessor.process(uncert)
-
-            if uncert_threshold is not None:
-                uncert = (uncert >= uncert_threshold).astype(float)
-            else:
-                uncert = uncert / 65535
-            uncert_pad = cv2.copyMakeBorder(uncert, 0, (patch_size - uncert.shape[0]) % patch_size, 0, (patch_size - uncert.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
-            p_uncert, i_uncert = extract_grayscale_patches(uncert_pad, (patch_size, patch_size), stride = (patch_size, patch_size))
-            p_uncert = np.reshape(p_uncert,p_uncert.shape+(1,))
-            p_img = np.array([np.concatenate((img, uncert), axis=2) for img, uncert in zip(p_img, p_uncert)])
-
-        p_img_predicted = model.predict(p_img, batch_size=batch_size)
-        if output_channels > 1:
-            p_img_predicted = np.argmax(p_img_predicted, axis=-1)
-        else:
-            p_img_predicted = p_img_predicted[..., 0]
-        mask_predicted = reconstruct_from_grayscale_patches(p_img_predicted,i_img)[0]
-        mask_predicted = mask_predicted[:img.shape[0], :img.shape[1]]
-
-        if output_channels > 1:
-            mask_predicted = (255 // output_channels) * mask_predicted
-            mask_predicted[mask_predicted==254] = 255
-        elif cutoff is not None:
-            # thresholding to make binary mask
-            mask_predicted[mask_predicted < cutoff] = 0
-            mask_predicted[mask_predicted >= cutoff] = 255
-        else:
-            mask_predicted = 255 * mask_predicted
-        io.imsave(Path(out_path, filename.stem + '_pred.png'), mask_predicted.astype(np.uint8))
-
-
-
-def predict_bayes(model, img_path, out_path, uncert_path=None, uncert_threshold=None, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 20, output_confidence= False):
+def predict(model, img_path, out_path, uncert_path=None, uncert_threshold=None, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 20):
     if not Path(out_path).exists():
         Path(out_path).mkdir(parents=True)
 
@@ -112,17 +50,27 @@ def predict_bayes(model, img_path, out_path, uncert_path=None, uncert_threshold=
             uncert_pad = cv2.copyMakeBorder(uncert, 0, (patch_size - uncert.shape[0]) % patch_size, 0, (patch_size - uncert.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
             p_uncert, i_uncert = extract_grayscale_patches(uncert_pad, (patch_size, patch_size), stride = (patch_size, patch_size))
             p_uncert = np.reshape(p_uncert,p_uncert.shape+(1,))
-            p_img = np.array([np.concatenate((img, uncert), axis=2) for img, uncert in zip(p_img, p_uncert)])
+            p_img = [np.concatenate((img, uncert), axis=2) for img, uncert in zip(p_img, p_uncert)]
 
+        p_img_predicted  = []
+        p_uncertainty = []
+        for b_index in range((len(p_img) // batch_size) + 1):
+            if ((b_index+1) * batch_size < len(p_img)):
+                p_batch = np.array(p_img[b_index * batch_size:(b_index+1)*batch_size])
+            elif b_index * batch_size < len(p_img):
+                p_batch = np.array(p_img[b_index * batch_size:])
+            else:
+                break
 
-        predictions = []
-        for i in range(mc_iterations):
-            prediction = model.predict(p_img, batch_size=batch_size)
-            predictions.append(prediction)
-        predictions = np.array(predictions)
+            predictions = []
+            for i in range(mc_iterations):
+                prediction = model.predict(p_batch)
+                predictions.append(prediction)
+            p_img_predicted.append(np.mean(predictions, axis=0))
+            p_uncertainty.append(np.var(predictions, axis=0))
 
-
-        p_img_predicted = predictions.mean(axis=0)
+        p_img_predicted = np.concatenate(p_img_predicted)
+        p_uncertainty = np.concatenate(p_uncertainty)
 
         if output_channels > 1:
             p_img_predicted = np.argmax(p_img_predicted, axis=-1)
@@ -133,8 +81,8 @@ def predict_bayes(model, img_path, out_path, uncert_path=None, uncert_threshold=
         mask_predicted = reconstruct_from_grayscale_patches(p_img_predicted,i_img)[0]
         mask_predicted = mask_predicted[:img.shape[0], :img.shape[1]]
 
-        mask_predicted_img = 65535 * mask_predicted
-        io.imsave(Path(out_path, filename.stem + '_pred_perc.png'), mask_predicted_img.astype(np.uint16))
+        #mask_predicted_img = 65535 * mask_predicted
+        #io.imsave(Path(out_path, filename.stem + '_pred_perc.png'), mask_predicted_img.astype(np.uint16))
 
         if output_channels > 1:
             mask_predicted = (255 // output_channels) * mask_predicted
@@ -148,24 +96,21 @@ def predict_bayes(model, img_path, out_path, uncert_path=None, uncert_threshold=
         io.imsave(Path(out_path, filename.stem + '_pred.png'), mask_predicted.astype(np.uint8))
 
 
-        p_uncertainty = predictions.var(axis=0)
         if output_channels > 1:
             uncertainty = np.zeros(img.shape + (output_channels,))
             for ch in range(output_channels):
-                uncertainty[:,:, ch] = reconstruct_from_grayscale_patches(p_uncertainty[...,ch],i_img)[0]
+                mask_predicted = mask_predicted[:img.shape[0], :img.shape[1]]
+                reconstructed = reconstruct_from_grayscale_patches(p_uncertainty[...,ch],i_img)[0]
+                uncertainty[:,:, ch] = reconstructed[:img.shape[0], :img.shape[1]]
         else:
             uncertainty = reconstruct_from_grayscale_patches(p_uncertainty[..., 0],i_img)[0]
+            uncertainty = uncertainty[:img.shape[0], :img.shape[1]]
 
-        uncertainty = uncertainty[:img.shape[0], :img.shape[1]]
         uncertainty_img = (65535 * uncertainty).astype(np.uint16)
-        io.imsave(Path(out_path, filename.stem + '_uncertainty.png'), uncertainty_img, check_contrast=False )
 
-        if output_confidence:
-            confidence_img = mask_predicted[:,:,None] * np.ones((img.shape[0], img.shape[1], 3)) # broadcast to rgb img
-            confidence_img = confidence_img.astype(np.uint8)
-            if uncert_threshold is not None:
-                confidence_img[uncertainty >= uncert_threshold, :] = np.array([255, 0,0])   # make  uncertain pixels red
-            io.imsave(Path(out_path, filename.stem + '_confidence.png'), confidence_img)
+        if not Path(out_path, 'uncertainty').exists():
+            Path(out_path, 'uncertainty').mkdir()
+        cv2.imwrite(str(Path(out_path, 'uncertainty', filename.stem + '_uncertainty.png')), uncertainty_img)
 
 
 def get_cutoff_point(model, val_path, out_path, batch_size=16, patch_size=256, cutoff_pts=np.arange(0.2, 0.8, 0.025), preprocessor=None, mc_iterations=20, uncert_threshold=None):
