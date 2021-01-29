@@ -34,7 +34,7 @@ def plot_history(history, out_file, xlim=None, ylim=None, title=None):
     #plt.show()
 
 path = Path('/home/andreas/glacier-front-detection/output/2ndStage_threshold')
-out = Path('/home/andreas/thesis/master-thesis/2ndStage_results')
+out = Path('/home/andreas/thesis/presentation')
 test_path = Path('/home/andreas/glacier-front-detection/datasets/front_detection_dataset/test')
 if not out.exists():
     out.mkdir(parents=True)
@@ -141,6 +141,8 @@ with open(Path(out,'results_' + path.name + '.tex'), 'w') as f:
 
 
 scores_mean = all_scores.mean(skipna=True, numeric_only=True, level=0)
+scores_mean = scores_mean.loc[['Zhang', 'Bayesian', 'Optimized']]
+
 
 for column in scores_mean.columns:
     if column == 'image':
@@ -154,69 +156,75 @@ for column in scores_mean.columns:
         ax = sns.barplot(scores_mean.index, scores_mean[column], ci=None)
         ax.grid(False)
         ax.set(xlabel='Method', ylabel=column.title())
+    elif column == 'uncertainty':
+        uncertainty_scores = scores_mean.loc[['Bayesian', 'Optimized']]
+        ax = sns.barplot(uncertainty_scores.index, uncertainty_scores[column], ci=None)
+        ax.grid(False)
+        ax.set(xlabel='Method', ylabel=column.title())
     else:
         ax = sns.barplot(scores_mean.index, 100 * scores_mean[column], ci=None)
         ax.grid(False)
         ax.set(ylim=(85,100), xlabel='Method', ylabel=column.title() + " %")
-    for p in ax.patches:
-        ax.annotate(format(p.get_height(), '.2f'),
-                    (p.get_x() + p.get_width() / 2., p.get_height()),
-                    ha = 'center', va = 'center',
-                    size=15,
-                    xytext = (0, -12),
-                    textcoords = 'offset points')
-    #plt.savefig(str(Path(out, 'imgs', 'score_Unet_' + column + '.png')), bbox_inches='tight', format='png', dpi=200)
+    if column != 'uncertainty':
+        for p in ax.patches:
+            ax.annotate(format(p.get_height(), '.2f'),
+                        (p.get_x() + p.get_width() / 2., p.get_height()),
+                        ha = 'center', va = 'center',
+                        size=15,
+                        xytext = (0, -12),
+                        textcoords = 'offset points')
+    plt.savefig(str(Path(out, 'imgs', 'score_Unet_' + column + '.png')), bbox_inches='tight', format='png', dpi=200)
     plt.show()
 
 
 
 def graphicsline(img, width="width=0.12\\textwidth"):
     return  "\\includegraphics[" + width + "]{imgs/" + img + "}"
-#with open(Path(out,'image_table.tex'), 'w') as f:
-#    f.write("\\begingroup\n")
-#    f.write("\\setlength{\\tabcolsep}{1pt}\n")
-#    line = "\\begin{tabular}{c c "
-#    for _ in imgs:
-#        line += "c "
-#    line += "}\n"
-#    f.write(line)
-#
-#    line = "& "
-#    for c in range(len(imgs)):
-#        line += "& " + string.ascii_uppercase[c]
-#    line += "\\\\\n"
-#    f.write(line)
-#
-#    f.write("& Input Image \n")
-#    for basename in imgs:
-#        f.write("& " + graphicsline(basename + ".png") + "\n")
-#    f.write("\\\\\n")
-#    f.write("& Ground Truth\n")
-#    for basename in imgs:
-#        f.write("& " + graphicsline(basename + "_zones.png") + "\n")
-#    f.write("\\\\\n")
-#
-#    dirs = [d for d in path.iterdir() if d.is_dir()]
-#    dirs.sort()
-#    for d in dirs:
-#
-#        identifier = d.name
-#
-#        f.write("\\midrule\n")
-#        if Path(d, basename + '_uncertainty.png').exists():
-#            f.write("\\multirow{3}{*}{\\shortstack[l]{ " +identifier.replace("_", " ").title() + "}} \n")
-#        else:
-#            f.write("\\shortstack[l]{ " + identifier.replace("_", " ").title() + "} \n")
-#        f.write("& Prediction\n")
-#        for basename in imgs:
-#            f.write("& " + graphicsline(identifier + "_" + basename + "_pred.png") + "\n")
-#        f.write("\\\\\n")
-#        if Path(d, basename + '_uncertainty.png').exists():
-#            f.write("& Uncertainty")
-#            for basename in imgs:
-#                f.write("& " + graphicsline(identifier + "_" + basename + "_uncertainty.png") + "\n")
-#            f.write("\\\\\n")
-#    f.write("\\end{tabular}\n")
-#    f.write("\\endgroup\n")
+with open(Path(out,'image_table.tex'), 'w') as f:
+    f.write("\\begingroup\n")
+    f.write("\\setlength{\\tabcolsep}{1pt}\n")
+    line = "\\begin{tabular}{c c "
+    for _ in imgs:
+        line += "c "
+    line += "}\n"
+    f.write(line)
+
+    line = "& "
+    for c in range(len(imgs)):
+        line += "& " + string.ascii_uppercase[c]
+    line += "\\\\\n"
+    f.write(line)
+
+    f.write("& Input Image \n")
+    for basename in imgs:
+        f.write("& " + graphicsline(basename + ".png") + "\n")
+    f.write("\\\\\n")
+    f.write("& Ground Truth\n")
+    for basename in imgs:
+        f.write("& " + graphicsline(basename + "_zones.png") + "\n")
+    f.write("\\\\\n")
+
+    dirs = [d for d in path.iterdir() if d.is_dir()]
+    dirs.sort()
+    for d in dirs:
+
+        identifier = d.name
+
+        f.write("\\midrule\n")
+        if Path(d, basename + '_uncertainty.png').exists():
+            f.write("\\multirow{3}{*}{\\shortstack[l]{ " +identifier.replace("_", " ").title() + "}} \n")
+        else:
+            f.write("\\shortstack[l]{ " + identifier.replace("_", " ").title() + "} \n")
+        f.write("& Prediction\n")
+        for basename in imgs:
+            f.write("& " + graphicsline(identifier + "_" + basename + "_pred.png") + "\n")
+        f.write("\\\\\n")
+        if Path(d, basename + '_uncertainty.png').exists():
+            f.write("& Uncertainty")
+            for basename in imgs:
+                f.write("& " + graphicsline(identifier + "_" + basename + "_uncertainty.png") + "\n")
+            f.write("\\\\\n")
+    f.write("\\end{tabular}\n")
+    f.write("\\endgroup\n")
 
 
