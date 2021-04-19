@@ -11,7 +11,6 @@ import numpy as np
 import tensorflow.keras as keras
 from tensorflow.keras.models import load_model
 import os
-from CLR.clr_callback import CyclicLR
 from layers.BayesDropout import  BayesDropout
 import pandas as pd
 

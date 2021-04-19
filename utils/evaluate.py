@@ -33,9 +33,11 @@ def eval_img(gt_file, pred_file, img_name, uncertainty_file=None):
     scores = {}
     try:
         scores['image'] = img_name
+        dice = metrics.dice_coefficient(gt_flat, pred_flat)
         scores['dice']= metrics.dice_coefficient(gt_flat, pred_flat)
         scores['euclidian'] = distance.euclidean(gt_flat, pred_flat)
-        scores['IOU'] = metrics.IOU(gt_flat, pred_flat)
+        #scores['IOU'] = metrics.IOU(gt_flat, pred_flat)
+        scores['IOU'] = dice / (2-dice)
         scores['specificity'] = metrics.specificity(gt_flat, pred_flat)
         scores['sensitivity'] = recall_score(gt_flat, pred_flat)
         if uncertainty_file:
@@ -299,9 +301,9 @@ def eval_uncertainty(file, out_file, vmin=0, vmax=0.2):
     plt.savefig(out_file, bbox_inches='tight', format='png', dpi=200)
 
 if __name__ == '__main__':
-    path = Path('front1_bayes/')
+    path = Path('../output/output_front1_zhang_2')
 
-    test_path = Path('datasets/front_detection_dataset/test/')
+    test_path = Path('../datasets/front_detection_dataset/test/')
     evaluate(Path(test_path, 'masks'), path)
     #test_path = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_front_only/test')
     #history = pickle.load(open(next(path.glob('history*.pkl')), 'rb'))

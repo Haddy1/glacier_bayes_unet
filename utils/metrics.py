@@ -31,6 +31,15 @@ def dice_coefficient(u,v):
         c_u = np.sum(u**2)
         c_v = np.sum(v**2)
     return 2 * c_uv / (c_u + c_v)
+
+
+def IOU(y_true, y_pred):
+
+    intersection = np.sum(y_true * y_pred)
+    union = y_true.size
+    return intersection / union
+
+
 def dice_coefficient_tf(u,v):
     """
     For binary vectors the Dice cooefficient can be written as
@@ -52,7 +61,6 @@ def dice_coefficient_tf(u,v):
     return 2 * c_uv / (c_u + c_v)
 
 
-
 def specificity(y_true, y_pred):
     neg_y_true = 1 - y_true
     neg_y_pred = 1 - y_pred
@@ -60,6 +68,8 @@ def specificity(y_true, y_pred):
     tn = np.sum(neg_y_true * neg_y_pred)
     result = tn / (tn + fp + K.epsilon())
     return result
+
+
 def specificity_tf(y_true, y_pred):
     neg_y_true = 1 - y_true
     neg_y_pred = 1 - y_pred
@@ -68,14 +78,14 @@ def specificity_tf(y_true, y_pred):
     result = tn / (tn + fp + K.epsilon())
     return result
 
-def IOU(y_true, y_pred):
-    intersection = np.sum(y_true == y_pred)
-    union = y_true.size
-    return intersection / union
+
+
+
 def IOU_tf(y_true, y_pred):
     intersection = tf.reduce_sum(y_true * y_pred)
     union = tf.cast(tf.size(y_true), tf.float32)
     return intersection / union
+
 
 def euclidian_tf(y_true, y_pred):
     return tf.reduce_sum((y_true - y_pred)**2)
@@ -86,10 +96,6 @@ def line_graph(y_true, y_pred):
     gt_y_start = np.argmin(gt_line[0])
     gt_start = (gt_y_start, np.argmin(gt_line[1][gt_y_start]))
     gt_dist = cdist(gt_line, gt_line)
-
-
-
-
 
 
 def line_accuracy(y_true, y_pred):
