@@ -18,7 +18,7 @@ import os
 from utils.helper_functions import check_data_path
 from predict import get_cutoff_point
 from utils.data import imgGenerator
-def train(model_name, train_path, val_path, out_path, args, train_uncert_path=None, val_uncert_path=None, loss_function=binary_crossentropy, preprocessor=None, second_stage=False, clr_callback=None):
+def train(model_name, train_path, val_path, out_path, args, train_uncert_path=None, val_uncert_path=None, loss_function=binary_crossentropy, preprocessor=None, second_stage=False):
 
     #check input paths
     check_data_path(train_path)
@@ -139,9 +139,6 @@ def train(model_name, train_path, val_path, out_path, args, train_uncert_path=No
     num_val_samples = len([file for file in Path(patches_path_val, 'images').rglob('*.png')])  # number of val samples
 
     callbacks.append(keras.callbacks.EarlyStopping('val_loss', patience=args.patience, verbose=0, mode='auto', restore_best_weights=True))
-
-    if clr_callback is not None:
-        callbacks.append(clr_callback)
 
     steps_per_epoch = np.ceil(num_samples / args.batch_size)
     validation_steps = np.ceil(num_val_samples / args.batch_size)

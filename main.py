@@ -13,6 +13,7 @@ from tensorflow.keras.models import load_model
 import os
 from layers.BayesDropout import  BayesDropout
 import pandas as pd
+
 from utils.data import trainGenerator, imgGenerator
 import models
 from utils import helper_functions
@@ -24,7 +25,6 @@ from preprocessing import data_generator, filter
 from predict import predict, get_cutoff_point
 from utils import  evaluate
 from train import train
-from CLR.clr_callback import CyclicLR
 
 if __name__ == '__main__':
     # Hyper-parameter tuning
@@ -50,10 +50,6 @@ if __name__ == '__main__':
                         help='dictionary with parameters for denoise filter')
     parser.add_argument('--contrast', action='store_true', help='Contrast Enhancement')
     parser.add_argument('--patches_only', action='store_true', help='Training data is already split into image patches')
-
-    parser.add_argument('--cyclic_learning', action='store_true', help='use cyclic learning')
-    parser.add_argument('--clr_parameters', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...",
-                        help='dictionary with parameters for cyclic learning callback')
 
     parser.add_argument('--out_path', type=str, help='Output path for results')
     parser.add_argument('--data_path', type=str, help='Path containing training and val data')
@@ -140,14 +136,6 @@ if __name__ == '__main__':
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(25, 25))  # CLAHE adaptive contrast enhancement
         preprocessor.add_filter(clahe.apply)
 
-    if args.cyclic_learning:
-        if args.clr_parameters is not None:
-            clr = CyclicLR(**args.clr_parameters)
-        else:
-            clr = CyclicLR(base_lr=1e-7, max_lr= 1e-2,step_size = 5*996)
-    else:
-        clr = None
-
     loss_function = get_loss_function(args.loss, args.loss_parms)
 
     if 'bayes' in args.model or 'uncert' in args.model:
@@ -157,7 +145,7 @@ if __name__ == '__main__':
 
     if args.model == 'uncert_net':
         #1st Stage
-        model_1st, history_1st, cutoff_1st = train('unet_bayes', train_path, val_path, Path(out_path, '1stStage'), args, loss_function=loss_function, preprocessor=preprocessor, clr_callback=clr)
+        model_1st, history_1st, cutoff_1st = train('unet_bayes', train_path, val_path, Path(out_path, '1stStage'), args, loss_function=loss_function, preprocessor=preprocessor)
         predict(model_1st,
                 Path(train_path, 'images'),
                 Path(out_path, '1stStage, train'),
@@ -182,9 +170,7 @@ if __name__ == '__main__':
         model, history, cutoff = train('unet_bayes', train_path, val_path, out_path, args,
                                                    train_uncert_path=Path(out_path,'1stStage/train/uncertainty/patches'),
                                                    val_uncert_path=Path(out_path, '1stStage/val/uncertainty/patches'),
-                                                   loss_function=loss_function,
-                                                    preprocessor=preprocessor,
-                                                    clr_callback=clr)
+                                                   loss_function=loss_function, preprocessor=preprocessor)
 
         # predict 1st Stage
         if not args.no_predict:
@@ -214,7 +200,7 @@ if __name__ == '__main__':
 
     # single stage mode
     else:
-        model, history, cutoff = train(args.model, train_path, val_path, out_path, args, loss_function=loss_function, preprocessor=preprocessor, clr_callback=clr)
+        model, history, cutoff = train(args.model, train_path, val_path, out_path, args, loss_function=loss_function, preprocessor=preprocessor)
         if not args.no_predict:
             if args.second_stage:
                 uncert_test_path = Path(test_path, 'uncertainty')
