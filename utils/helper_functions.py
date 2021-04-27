@@ -8,6 +8,9 @@ import errno
 import os
 
 def set_font_size(small=8, medium=10, bigger=12):
+    """
+    Set the font size for matplotlib
+    """
     matplotlib.rc('font', size=small)          # controls default text sizes
     matplotlib.rc('axes', titlesize=small)     # fontsize of the axes title
     matplotlib.rc('axes', labelsize=medium)    # fontsize of the x and y labels
@@ -28,6 +31,9 @@ def get_gpu_memory():
 
 
 class StoreDictKeyPair(argparse.Action):
+    """
+    Store argparser argument as Dictionary
+    """
     def __call__(self, parser, namespace, values, option_string=None):
         my_dict = {}
         for kv in values.split(","):
@@ -56,6 +62,7 @@ def split_datasets(dataset):
     return tensors
 
 def nat_sort(l):
+    "Implementation for lexigraphic sort"
     def tryint(s):
         try:
             return int(s)
@@ -72,6 +79,11 @@ def nat_sort(l):
 
 
 def check_data_path(data_path):
+    """
+    check if files for dataset exist
+    :param data_path: path to dataset
+    :return: boolean
+    """
     # Check if input paths exist
     if not Path(data_path).exists():
         raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), str(data_path))

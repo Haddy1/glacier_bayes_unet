@@ -13,6 +13,16 @@ from shutil import copy, rmtree
 from multiprocessing import Pool
 
 def process_imgs(in_dir, out_dir, patch_size=256, preprocessor = None, augment = None, border='zeros'):
+    """
+    Split images into patches
+    :param in_dir: directory containing images
+    :param out_dir: output path for image patches
+    :param patch_size: size of the patches
+    :param preprocessor: preprocessing filter
+    :param augment: image augmentation function
+    :param border: boundary rule: zeros or crop (default: zeros)
+    :return: img_path_index: index information containing patchnumbers and original image name and size
+    """
 
     if not Path(out_dir).exists():
         Path(out_dir).mkdir(parents=True)
@@ -68,7 +78,20 @@ def process_imgs(in_dir, out_dir, patch_size=256, preprocessor = None, augment =
     return img_patch_index
 
 
-def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=None, augment = None, front_zone_only=False, border='zeros', combine=False, uncert_minmax=False):
+def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, augment = None, front_zone_only=False, border='zeros', combine=False, uncert_minmax=False):
+    """
+    Split datafolder into patches
+    :param in_dir: directory containing images, masks, uncertainty_masks folders
+    :param out_dir: path to output directory
+    :param patch_size: size of the patches
+    :param preprocessor: preprocessing filter
+    :param augment: image augmentation function
+    :param front_zone_only: Only use patches containing both classes
+    :param border: boundary rule: zeros or crop (default: zeros)
+    :param combine: combine image and segmentation into single image
+    :param uncert_minmax: Do minmax normalization on uncertainty masks
+    :return:
+    """
 
     if not Path(out_dir).exists():
         Path(out_dir).mkdir(parents=True)
@@ -76,8 +99,8 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
     if not combine:
         if not Path(out_dir, 'images').exists():
             Path(out_dir, 'images').mkdir()
-        if not Path(out_dir, 'masks').exists():
-            Path(out_dir, 'masks').mkdir()
+        if not Path(out_dir, 'masks_zones').exists():
+            Path(out_dir, 'masks_zones').mkdir()
 
     if Path(in_dir, 'uncertainty').exists() and not Path(out_dir, 'uncertainty').exists():
         Path(out_dir, 'uncertainty').mkdir()
@@ -85,10 +108,7 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
     if Path(in_dir, 'lines').exists() and not Path(out_dir, 'lines').exists():
         Path(out_dir, 'lines').mkdir()
 
-    if img_list:
-        files_img = img_list
-    else:
-        files_img = Path(in_dir, 'images').glob('*.png')
+    files_img = Path(in_dir, 'images').glob('*.png')
 
     patch_counter = 0
     img_patch_index = {}
@@ -99,16 +119,16 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
         if preprocessor is not None:
             img = preprocessor.process(img)
 
-        if Path(in_dir, 'masks', basename + '_zones.png').exists():
-            mask_zones = cv2.imread(str(Path(in_dir, 'masks', basename + '_zones.png')), cv2.IMREAD_GRAYSCALE)
+        if Path(in_dir, 'masks_zones', basename + '_zones.png').exists():
+            mask_zones = cv2.imread(str(Path(in_dir, 'masks_zones', basename + '_zones.png')), cv2.IMREAD_GRAYSCALE)
         else:
-            mask_zones = cv2.imread(str(Path(in_dir, 'masks', basename + '.png')), cv2.IMREAD_GRAYSCALE)
+            mask_zones = cv2.imread(str(Path(in_dir, 'masks_zones', basename + '.png')), cv2.IMREAD_GRAYSCALE)
 
         if Path(in_dir, 'lines').exists():
             if Path(in_dir, 'lines', basename + '_front.png').exists():
-                front = cv2.imread(str(Path(in_dir, 'lines', basename + '_front.png')), cv2.IMREAD_GRAYSCALE)
+                front = cv2.imread(str(Path(in_dir, 'masks_lines', basename + '_front.png')), cv2.IMREAD_GRAYSCALE)
             else:
-                front = cv2.imread(str(Path(in_dir, 'lines', basename + '.png')), cv2.IMREAD_GRAYSCALE)
+                front = cv2.imread(str(Path(in_dir, 'masks_lines', basename + '.png')), cv2.IMREAD_GRAYSCALE)
 
         if Path(in_dir, 'uncertainty').exists():
             if Path(in_dir, 'uncertainty', basename + '_uncertainty.png').exists():
@@ -178,8 +198,8 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
                         cv2.imwrite(str(Path(out_dir, str(patch_counter)+'.png')), combined)
                     else:
                         cv2.imwrite(str(Path(out_dir, 'images/'+str(patch_counter)+'.png')), p_img[j])
-                        cv2.imwrite(str(Path(out_dir, 'masks/'+str(patch_counter)+'.png')), p_mask_zones[j])
-                    cv2.imwrite(str(Path(out_dir, 'lines/'+str(patch_counter)+'.png')), p_front[j])
+                        cv2.imwrite(str(Path(out_dir, 'masks_zones/'+str(patch_counter)+'.png')), p_mask_zones[j])
+                    cv2.imwrite(str(Path(out_dir, 'masks_lines/'+str(patch_counter)+'.png')), p_front[j])
                     if uncertainty is not None:
                         cv2.imwrite(str(Path(out_dir, 'uncertainty/'+str(patch_counter)+'.png')), p_uncert[j])
 
@@ -202,15 +222,25 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, img_list=
     return img_patch_index
 
 
-def generate_subset(data_dir, out_dir, split=None, patch_size=256, preprocessor=None, augment=None, patches_only=False, img_list=None, border='zeros', front_zone_only=False, uncert_minmax=False):
+def generate_subset(data_dir, out_dir, split=None, patch_size=256, preprocessor=None, augment=None, patches_only=False, border='zeros', front_zone_only=False, uncert_minmax=False):
+    """
+    Generate subset of dataset and generate image patches
+    :param data_dir: directory containing images, masks, uncertainty_masks folders
+    :param out_dir: path to output directory
+    :param split: Ratio of data split
+    :param patch_size: size of the patches
+    :param preprocessor: preprocessing filter
+    :param augment: image augmentation function
+    :param patches_only: Only produce image patches
+    :param border: boundary rule: zeros or crop (default: zeros)
+    :param front_zone_only: Only use patches containing both classes
+    :param uncert_minmax: Do minmax normalization on uncertainty masks
+    """
     if not Path(data_dir).exists():
         print(str(data_dir) + " does not exist")
 
 
-    if img_list is not None:
-        files_img = img_list
-    else:
-        files_img = list(Path(data_dir, 'images').glob('*.png'))
+    files_img = list(Path(data_dir, 'images').glob('*.png'))
 
     if split is not None:
         if split < 1:
@@ -225,12 +255,12 @@ def generate_subset(data_dir, out_dir, split=None, patch_size=256, preprocessor=
     if not patches_only:
         if not Path(out_dir, 'images').exists():
             Path(out_dir, 'images').mkdir(parents=True)
-        if not Path(out_dir, 'masks').exists():
-            Path(out_dir, 'masks').mkdir()
+        if not Path(out_dir, 'masks_zones').exists():
+            Path(out_dir, 'masks_zones').mkdir()
         if Path(data_dir, 'uncertainty').exists() and not Path(out_dir, 'uncertainty').exists():
             Path(out_dir, 'uncertainty').mkdir()
-        if Path(data_dir, 'lines').exists() and not Path(out_dir, 'lines').exists():
-            Path(out_dir, 'lines').mkdir()
+        if Path(data_dir, 'masks_lines').exists() and not Path(out_dir, 'lines').exists():
+            Path(out_dir, 'masks_lines').mkdir()
 
         for f in img_subset:
             print(f)
@@ -238,7 +268,7 @@ def generate_subset(data_dir, out_dir, split=None, patch_size=256, preprocessor=
             img = cv2.imread(str(f), cv2.IMREAD_GRAYSCALE)
             if preprocessor is not None:
                 img = preprocessor.process(img)
-            mask_zones = cv2.imread(str(Path(data_dir, 'masks', basename + '_zones.png')), cv2.IMREAD_GRAYSCALE)
+            mask_zones = cv2.imread(str(Path(data_dir, 'masks_zones', basename + '_zones.png')), cv2.IMREAD_GRAYSCALE)
             if Path(data_dir, 'uncertainty').exists():
                 uncertainty = cv2.imread(str(Path(data_dir, 'uncertainty', basename + '_uncertainty.png')), cv2.IMREAD_GRAYSCALE)
                 if uncert_minmax:
@@ -264,8 +294,8 @@ def generate_subset(data_dir, out_dir, split=None, patch_size=256, preprocessor=
 
             for img, uncertainty, mask_zones ,augmentation, front  in zip(imgs, uncertainties, masks_zones, augs, fronts):
                 cv2.imwrite(str(Path(out_dir, 'images', basename + augmentation + '.png')), img)
-                cv2.imwrite(str(Path(out_dir, 'masks', basename + augmentation + '_zones.png')), mask_zones)
-                cv2.imwrite(str(Path(out_dir, 'lines', basename + augmentation + '_front.png')), front)
+                cv2.imwrite(str(Path(out_dir, 'masks_zones', basename + augmentation + '_zones.png')), mask_zones)
+                cv2.imwrite(str(Path(out_dir, 'masks_lines', basename + augmentation + '_front.png')), front)
                 if uncertainty is not None:
                     cv2.imwrite(str(Path(out_dir, 'uncertainty', basename + augmentation + '_uncertainty.png')), uncertainty)
 
@@ -280,61 +310,17 @@ def generate_subset(data_dir, out_dir, split=None, patch_size=256, preprocessor=
                      border=border,
                      uncert_minmax=uncert_minmax)
 
-def augment_patches(data_dir, out_dir, augment=None, split=None):
-    img_dir = Path(data_dir, "patches/images")
-    mask_dir = Path(data_dir, "patches/masks")
-    uncert_dir = Path(data_dir, "patches/uncertainty")
-    files_img = list(img_dir.glob('*.png'))
-
-    if split is not None:
-        if split < 1:
-            img_subset = random.sample(files_img, int(split * len(files_img)))
-        else:
-            img_subset = random.sample(files_img, split)
-    else:
-        img_subset = files_img
-
-    for f in img_subset:
-            basename = f.stem
-            img = cv2.imread(str(f), cv2.IMREAD_GRAYSCALE)
-            if preprocessor is not None:
-                img = preprocessor.process(img)
-            mask_zones = cv2.imread(str(Path(mask_dir, basename + '_zones.png')), cv2.IMREAD_GRAYSCALE)
-            if Path(uncert_dir).exists():
-                uncertainty = cv2.imread(str(Path(uncert_dir, basename + '_uncertainty.png')), cv2.IMREAD_GRAYSCALE)
-            else:
-                uncertainty = None
-
-            if augment is not None:
-                imgs, augs = augment(img)
-                masks_zones, _ = augment(mask_zones)
-                uncertainties, _ = augment(uncertainty)
-            else:
-                imgs = [img]
-                masks_zones= [mask_zones]
-                uncertainties = [uncertainty]
-                augs = ['']
-
-            for img, uncertainty, mask_zones ,augmentation  in zip(imgs, uncertainties, masks_zones, augs):
-                cv2.imwrite(str(Path(out_dir, 'patches/images', basename + augmentation + '.png')), img)
-                cv2.imwrite(str(Path(out_dir, 'patches/masks', basename + augmentation + '_zones.png')), mask_zones)
-                if uncertainty is not None:
-                    cv2.imwrite(str(Path(out_dir, 'patches/uncertainty', basename + augmentation + '_uncertainty.png')), uncertainty)
-
-
-def generate_pix2pix_set(data_dir, out_dir, patch_size=256, front_zone_only=True, border='zeros', combine=True):
-    process_data(data_dir, Path(out_dir), patch_size=patch_size, front_zone_only=front_zone_only, border=border, combine=combine)
 
 
 def split_set(data_dir, out_dir1, out_dir2, split):
     if not Path(out_dir1).exists():
         Path(out_dir1, 'images').mkdir(parents=True)
-        Path(out_dir1, 'masks').mkdir(parents=True)
+        Path(out_dir1, 'masks_zones').mkdir(parents=True)
         if Path(data_dir, 'uncertainty').exists():
             Path(out_dir1, 'uncertainty').mkdir(parents=True)
     if not Path(out_dir2).exists():
         Path(out_dir2, 'images').mkdir(parents=True)
-        Path(out_dir2, 'masks').mkdir(parents=True)
+        Path(out_dir2, 'masks_zones').mkdir(parents=True)
         if Path(data_dir, 'uncertainty').exists():
             Path(out_dir2, 'uncertainty').mkdir(parents=True)
 
@@ -350,33 +336,16 @@ def split_set(data_dir, out_dir1, out_dir2, split):
     for f in set1:
         basename = f.stem
         copy(f, Path(out_dir1, 'images'))
-        copy(Path(data_dir, 'masks', basename + '_zones.png'), Path(out_dir1, 'masks'))
+        copy(Path(data_dir, 'masks_zones', basename + '_zones.png'), Path(out_dir1, 'masks_zones'))
         if Path(data_dir, 'uncertainty').exists():
             copy(Path(data_dir, 'uncertainty', basename + '_uncertainty.png'), Path(out_dir1, 'uncertainty'))
 
     for f in set2:
         basename = f.stem
         copy(f, Path(out_dir2, 'images'))
-        copy(Path(data_dir, 'masks', basename + '_zones.png'), Path(out_dir2, 'masks'))
+        copy(Path(data_dir, 'masks_zones', basename + '_zones.png'), Path(out_dir2, 'masks_zones'))
         if Path(data_dir, 'uncertainty').exists():
             copy(Path(data_dir, 'uncertainty', basename + '_uncertainty.png'), Path(out_dir2, 'uncertainty'))
-
-
-def bayes_train_gen(img_path, pred_path, out_path, uncertainty_threshold = 1e-3):
-
-    if not Path(out_path).exists():
-        Path(out_path).mkdir(parents=True)
-    if not Path(out_path, 'images').exists():
-        Path(out_path, 'images').mkdir(parents=True)
-    if not Path(out_path, 'masks').exists():
-        Path(out_path, 'masks').mkdir(parents=True)
-
-    for f in Path(img_path).rglob('*.png'):
-        basename = f.stem
-        uncertainty = io.imloadPath(pred_path, basename + '_uncertainty.png') / 65535
-        if np.mean(uncertainty) < uncertainty_threshold:
-            copy(f, Path(out_path, 'images'))
-            copy(Path(pred_path, basename + '_pred.png'), Path(out_path, 'images'))
 
 
 
@@ -388,44 +357,4 @@ if __name__ == "__main__":
     random.seed(1)
     patch_size = 256
 
-    preprocessor = preprocessor.Preprocessor()
 
-    #data_dir = Path('/disks/data1/oc39otib/glacier-front-detection/datasets/front_detection_dataset')
-    data_dir = Path('/home/andreas/glacier-front-detection/datasets/front_detection_dataset')
-    out_dir = Path('../datasets/debug')
-
-    generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=False, augment=None, split=2)
-    generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=False, front_zone_only=False, augment=None, split=1)
-    generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=False, front_zone_only=False, augment=None, split=1)
-    #generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=True, front_zone_only=True, augment=augmentation.flip)
-    #generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=True, front_zone_only=True, augment=augmentation.flip)
-    #generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patches_only=True)
-    #generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patches_only=True)
-    #generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patches_only=True)
-
-
-    #out_dir = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_pix2pix')
-    #data_dir = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn')
-
-    #generate_pix2pix_set(Path(data_dir, 'train'), Path(out_dir, 'train'), patch_size=256)
-    #generate_pix2pix_set(Path(data_dir, 'val'), Path(out_dir, 'val'), patch_size=256)
-    #generate_pix2pix_set(Path(data_dir, 'test'), Path(out_dir, 'test'), patch_size=256)
-    #generate_pix2pix_set(Path(data_dir, 'unlabeled'), Path(out_dir, 'unlabeled'), patch_size=256)
-    #generate_subset(Path(data_dir, 'train'), Path(out_dir, 'train'), patch_size=256, front_zone_only=True, patches_only=True, augment=None)
-    #generate_subset(Path(data_dir, 'val'), Path(out_dir, 'val'), patch_size=256, augment=None, front_zone_only=True)
-    #generate_subset(Path(data_dir, 'test'), Path(out_dir, 'test'), patch_size=256, front_zone_only=True)
-    #generate_subset(Path(data_dir, 'unlabeled'), Path(out_dir, 'unlabeled'), patch_size=256, front_zone_only=True, patches_only=True, augment=None)
-    #generate_subset(Path(out_dir, 'val'), Path(out_dir, 'val'), patch_size=256)
-    #generate_subset(Path(out_dir, 'test'), Path(out_dir, 'test'), patch_size=256)
-    #split_set(Path(out_dir, 'rest'), Path(out_dir, 'val'), Path(out_dir, 'test'), split=0.5)
-    #generate_subset(Path(out_dir, 'test'), Path(out_dir, 'test'), patch_size=None)
-
-    #split_set(Path(data_dir), Path(out_dir, 'unlabeled'), Path(out_dir, 'tmp'), split=0.6)
-    #generate_subset(Path(out_dir, 'tmp/set1'), Path(out_dir, 'train1'), patch_size=patch_size,patches_only=True)
-    #generate_subset(Path(out_dir, 'tmp/set2'), Path(out_dir, 'train2'), patch_size=patch_size,patches_only=True)
-
-    #rmtree(Path(out_dir, 'tmp'))
-
-    #split_set(Path(out_dir, 'tmp2'), Path(out_dir, 'tmp_val'), Path(out_dir, 'test'), split=0.5)
-    #generate_subset(Path(out_dir, 'tmp_val'), Path(out_dir, 'val'), patch_size=patch_size)
-    #generate_subset(Path(out_dir, 'tmp/set2'), Path(out_dir, 'val2'), patch_size=patch_size)

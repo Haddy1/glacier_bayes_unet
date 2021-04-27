@@ -1,4 +1,7 @@
 class Preprocessor:
+    """
+    Preprocessor Pipeline
+    """
     filter_list = []
 
     def add_filter(self, filter):

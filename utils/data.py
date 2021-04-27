@@ -74,6 +74,7 @@ def trainGenerator(batch_size,train_path,image_folder, mask_folder, uncertainty_
             color_mode = 'grayscale'
         uncertainty_generator= image_datagen.flow_from_directory(
             uncertainty_folder,
+            classes = ['.'],
             class_mode = None,
             color_mode = color_mode,
             target_size = target_size,

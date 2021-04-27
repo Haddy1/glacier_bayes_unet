@@ -27,7 +27,6 @@ from utils import  evaluate
 from train import train
 
 if __name__ == '__main__':
-    # Hyper-parameter tuning
     parser = argparse.ArgumentParser(description='Glacier Front Segmentation')
 
     parser.add_argument('--epochs', default=250, type=int, help='number of training epochs (integer value > 0)')
@@ -48,22 +47,20 @@ if __name__ == '__main__':
                         choices=["none", "bilateral", "median", 'nlmeans', "enhanced_lee", "kuan"], default="None")
     parser.add_argument('--denoise_parms', action=helper_functions.StoreDictKeyPair, metavar="KEY1=VAL1,KEY2=VAL2...",
                         help='dictionary with parameters for denoise filter')
-    parser.add_argument('--contrast', action='store_true', help='Contrast Enhancement')
     parser.add_argument('--patches_only', action='store_true', help='Training data is already split into image patches')
 
     parser.add_argument('--out_path', type=str, help='Output path for results')
     parser.add_argument('--data_path', type=str, help='Path containing training and val data')
-    parser.add_argument('--model', default='uncert_net', type=str, help='Training Model to use - can be pretrained model')
+    parser.add_argument('--model', default='two_stage', type=str, help='Training Model to use - can be pretrained model', choices=['unet', 'unet_bayes', 'two_stage'])
     parser.add_argument('--drop_rate', default=0.5, type=float, help='Dropout for Bayesian Unet')
     parser.add_argument('--learning_rate', type=float, default=1e-4, help='Initial learning rate')
     parser.add_argument('--no_predict', action='store_true', help='Dont predict testset')
     parser.add_argument('--no_evaluate', action='store_true', help='Dont evaluate')
     parser.add_argument('--mc_iterations', type=int, default=20, help='Nr Monte Carlo Iterations for Bayes model')
     parser.add_argument('--second_stage', action='store_true', help='Second Stage training')
-    parser.add_argument('--uncert_threshold', type=float, default=None, help='Threshold for uncertainty binarisation')
+    parser.add_argument('--uncert_threshold', type=float, default=0.125, help='Threshold for uncertainty binarisation')
     parser.add_argument('--multi_class', action='store_true', help='Use MultiClass Segmentation')
 
-    # parser.add_argument('--Random_Seed', default=1, type=int, help='random seed number value (any integer value)')
 
     args = parser.parse_args()
 
@@ -71,24 +68,19 @@ if __name__ == '__main__':
 
     patch_size = args.patch_size
 
-    if args.batch_size == -1:
-        gpu_mem = helper_functions.get_gpu_memory()[0]
-        if gpu_mem < 6000: batch_size = 4
-        elif gpu_mem < 10000: batch_size = 16
-        else: batch_size = 25
-        args.batch_size = batch_size
-    else:
-        batch_size = args.batch_size
+    batch_size = args.batch_size
 
+    # check for training data path
     train_path = Path(args.data_path, 'train')
     if not Path(train_path, 'images').exists():
-        if Path(train_path,'patches/images').exists() and args.model != 'uncert_net':
+        if Path(train_path,'patches/images').exists() and args.model != 'two_stage':
             train_path = Path(train_path, 'patches')
         else:
             raise FileNotFoundError("training images Path not found")
     if len(list(Path(train_path, 'images').glob("*.png"))) == 0:
         raise FileNotFoundError("No training images were found")
 
+    # Check for validation data path
     val_path = Path(args.data_path, 'val')
     if not Path(val_path, 'images').exists():
         if Path(val_path,'patches/images').exists():
@@ -98,6 +90,7 @@ if __name__ == '__main__':
     if len(list(Path(val_path, 'images').glob("*.png"))) == 0:
         raise FileNotFoundError("No validation images were found")
 
+    # Check for test data path
     if not args.no_predict:
         test_path = Path(args.data_path, 'test')
         if not Path(test_path, 'images').exists():
@@ -108,12 +101,11 @@ if __name__ == '__main__':
         if len(list(Path(test_path, 'images').glob("*.png"))) == 0:
             raise FileNotFoundError("No test images were found")
 
-
+    # Set output path
     if args.out_path:
         out_path = Path(args.out_path)
     else:
         out_path = Path('data_' + str(patch_size) + '/test/masks_predicted_' + time.strftime("%y%m%d-%H%M%S"))
-
 
     if not out_path.exists():
         out_path.mkdir(parents=True)
@@ -122,41 +114,53 @@ if __name__ == '__main__':
     with open(Path(out_path, 'options.json'), 'w') as f:
         f.write(json.dumps(vars(args)))
 
-    if args.second_stage:
-        uncert_threshold = args.uncert_threshold
-    else:
-        uncert_threshold = None
-
     # Preprocessing
     preprocessor = Preprocessor()
     if args.denoise:
         preprocessor.add_filter(filter.get_denoise_filter(args.denoise, args.denoise_parms))
 
-    if args.contrast:
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(25, 25))  # CLAHE adaptive contrast enhancement
-        preprocessor.add_filter(clahe.apply)
-
+    # get loss function from function name
     loss_function = get_loss_function(args.loss, args.loss_parms)
 
     if 'bayes' in args.model or 'uncert' in args.model:
         mc_iterations = args.mc_iterations
-    else:
+    else: # set Nr iterations to 1 for regular u-net
         mc_iterations = 1
 
-    if args.model == 'uncert_net':
+    # 2-Stage Optimization Process
+    if args.model == 'two_stage':
         #1st Stage
-        model_1st, history_1st, cutoff_1st = train('unet_bayes', train_path, val_path, Path(out_path, '1stStage'), args, loss_function=loss_function, preprocessor=preprocessor)
+
+        # if 1st stage already trained use trained model
+        if Path(out_path, '1stStage', 'model_unet_bayes.h5').exists():
+            model_1st = load_model(str(Path(out_path, '1stStage', 'model_unet_bayes.h5').absolute()), custom_objects={'loss': loss_function, 'BayesDropout':BayesDropout})
+
+            if Path(out_path, '1stStage', 'options.json').exists():
+                options_1st = json.load(open(Path(out_path, '1stStage', 'options.json'), 'r'))
+            else:
+                options_1st  = None
+
+            if options_1st is not None and 'cutoff' in options_1st:
+                cutoff_1st = options_1st['cutoff']
+            elif args.multi_class:
+                cutoff_1st = None
+            else:
+                cutoff_1st = 0.5
+        else:
+            print("1st stage training")
+            model_1st, cutoff_1st = train('unet_bayes', train_path, val_path, Path(out_path, '1stStage'), args, loss_function=loss_function, preprocessor=preprocessor)
+        print("1st stage prediction")
         predict(model_1st,
                 Path(train_path, 'images'),
-                Path(out_path, '1stStage, train'),
+                Path(out_path, '1stStage', 'train'),
                 batch_size=batch_size,
                 patch_size=patch_size,
                 preprocessor=preprocessor,
                 cutoff=cutoff_1st,
                 mc_iterations=args.mc_iterations)
         predict(model_1st,
-                Path(train_path, 'images'),
-                Path(out_path, '1stStage, val'),
+                Path(val_path, 'images'),
+                Path(out_path, '1stStage', 'val'),
                 batch_size=batch_size,
                 patch_size=patch_size,
                 preprocessor=preprocessor,
@@ -164,16 +168,15 @@ if __name__ == '__main__':
                 mc_iterations=args.mc_iterations)
 
         ##2ndStage
-        data_generator.process_imgs(Path(out_path,'1stStage/train/uncertainty'), Path(out_path, '1stStage/train/uncertainty/patches'))
-        data_generator.process_imgs(Path(out_path,'1stStage/val/uncertainty'), Path(out_path, '1stStage/val/uncertainty/patches'))
-
-        model, history, cutoff = train('unet_bayes', train_path, val_path, out_path, args,
-                                                   train_uncert_path=Path(out_path,'1stStage/train/uncertainty/patches'),
-                                                   val_uncert_path=Path(out_path, '1stStage/val/uncertainty/patches'),
-                                                   loss_function=loss_function, preprocessor=preprocessor)
+        print("2nd stage training")
+        model, cutoff = train('unet_bayes', train_path, val_path, out_path, args,
+                                                   train_uncert_path=Path(out_path,'1stStage/train/uncertainty'),
+                                                   val_uncert_path=Path(out_path, '1stStage/val/uncertainty'),
+                                                   loss_function=loss_function, preprocessor=preprocessor, second_stage=True)
 
         # predict 1st Stage
         if not args.no_predict:
+            print("2nd stage prediction")
             predict(model_1st,
                     Path(test_path, 'images'),
                     Path(out_path, '1stStage'),
@@ -183,7 +186,7 @@ if __name__ == '__main__':
                     cutoff=cutoff_1st,
                     mc_iterations=args.mc_iterations)
         if not args.no_evaluate:
-            evaluate.evaluate(Path(test_path, 'masks'), out_path)
+            evaluate.evaluate(Path(test_path, 'masks'), Path(out_path, '1stStage'))
 
         # predict 2ndStage
             predict(model,
@@ -200,7 +203,7 @@ if __name__ == '__main__':
 
     # single stage mode
     else:
-        model, history, cutoff = train(args.model, train_path, val_path, out_path, args, loss_function=loss_function, preprocessor=preprocessor)
+        model, cutoff = train(args.model, train_path, val_path, out_path, args, loss_function=loss_function, preprocessor=preprocessor)
         if not args.no_predict:
             if args.second_stage:
                 uncert_test_path = Path(test_path, 'uncertainty')

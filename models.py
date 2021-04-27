@@ -1,17 +1,8 @@
-import numpy as np
-import os
-import skimage.io as io
-import skimage.transform as trans
-import numpy as np
-import tensorflow.keras as keras
 from tensorflow.keras.models import *
 from tensorflow.keras.layers import *
-from tensorflow.keras.backend import learning_phase
 from tensorflow.keras.optimizers import *
 from tensorflow.keras.losses import *
 from layers.BayesDropout import BayesDropout
-from tensorflow.keras.callbacks import ModelCheckpoint, LearningRateScheduler
-from tensorflow.keras import backend as K
 from tensorflow.keras.layers import LeakyReLU
 
 
@@ -120,6 +111,7 @@ def unet(pretrained_weights = None, input_size = (256, 256, 1), output_channels=
 def unet_bayes(pretrained_weights = None, input_size = (256, 256, 1), output_channels=1, loss_function = binary_crossentropy, drop_rate=0.5):
     # this model is based on the following paper by Enze Zhang et al.:
     # Automatically delineating the calving front of Jakobshavn Isbræ from multitemporal TerraSAR-X images: a deep learning approach
+    # Dropout Layers have been added to make it a Bayesian U-Net
     inputs = Input(input_size)
     conv1 = Conv2D(32, 5, padding = 'same', kernel_initializer = 'he_normal')(inputs)
     conv1 = BatchNormalization()(conv1)

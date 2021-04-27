@@ -20,10 +20,18 @@ def eval_front(gt_front_file, pred_front_file):
     pred = (pred_img > 200).astype(int)
     pred_flat = pred.flatten()
     scores = {}
-    scores['line_accuracy'] = metrics.line_accuracy(gt_flat, pred_flat)
     return scores
 
 def eval_img(gt_file, pred_file, img_name, uncertainty_file=None):
+    """
+    Evaluate segmentaion Ground-Truth, Prediction pair
+    using Dice coefficent, Euclidian distance, IOU, Sensitivity and Specificity
+    :param gt_file: Ground truth segmentation
+    :param pred_file: Predicted segmentation
+    :param img_name: filename of image
+    :param uncertainty_file: uncertainty file for uncertainty score (optional)
+    :return: scores: dictionary with results ('image', 'dice', 'euclidian', 'IOU' 'specificity', 'sensitivity')
+    """
     gt_img = io.imread(gt_file, as_gray=True)
     gt = (gt_img > 200).astype(int)
     pred_img = io.imread(pred_file, as_gray=True)
@@ -33,11 +41,9 @@ def eval_img(gt_file, pred_file, img_name, uncertainty_file=None):
     scores = {}
     try:
         scores['image'] = img_name
-        dice = metrics.dice_coefficient(gt_flat, pred_flat)
         scores['dice']= metrics.dice_coefficient(gt_flat, pred_flat)
         scores['euclidian'] = distance.euclidean(gt_flat, pred_flat)
-        #scores['IOU'] = metrics.IOU(gt_flat, pred_flat)
-        scores['IOU'] = dice / (2-dice)
+        scores['IOU'] = metrics.IOU(gt_flat, pred_flat)
         scores['specificity'] = metrics.specificity(gt_flat, pred_flat)
         scores['sensitivity'] = recall_score(gt_flat, pred_flat)
         if uncertainty_file:
@@ -48,29 +54,38 @@ def eval_img(gt_file, pred_file, img_name, uncertainty_file=None):
         raise type(e)(str(e) + " for img " + img_name)
 
     return scores
+
 def eval_img_multiclass(gt_file, pred_file, img_name, uncertainty_file=None):
+    """
+    (DEFUNCT!)
+    Evaluation of Multiclass Ground_truth, Prediction segmentation pair
+    :param gt_file: Ground truth segmentation
+    :param pred_file: Predicted segmentation
+    :param img_name: filename of image
+    :param uncertainty_file: uncertainty file for uncertainty score (optional)
+    :return: scores: dictionary with results
+    """
     gt_img = io.imread(gt_file, as_gray=True)
     gt_img[gt_img == 254] = 255
     pred_img = io.imread(pred_file, as_gray=True)
 
-    gt_water = (gt_img == 0).astype(int)
-    gt_rock = (gt_img == 127).astype(int)
-    gt_glacier = (gt_img > 200).astype(int)
-    pred_water = (pred_img == 0).astype(int)
-    pred_rock = (pred_img == 127).astype(int)
-    pred_glacier = (pred_img > 200).astype(int)
+    gt_rock = (gt_img == 0).astype(int)
+    gt_glacier = ((gt_img >  0) & (gt_img <= 150)).astype(int)
+    gt_water = (gt_img > 150).astype(int)
+    pred_rock = (pred_img == 0).astype(int)
+    pred_glacier = ((pred_img > 0) & (pred_img <= 150)).astype(int)
+    pred_water = (pred_img > 150).astype(int)
     scores = {}
     try:
         dice_water = metrics.dice_coefficient(gt_water, pred_water)
         dice_rock = metrics.dice_coefficient(gt_rock, pred_rock)
         dice_glacier = metrics.dice_coefficient(gt_glacier, pred_glacier)
-        scores['Image'] = img_name
-        scores['Dice-Water']=  dice_water
-        scores['Dice-Rock']=  dice_rock
-        scores['Dice-Glacier']= dice_glacier
-        scores['Macro-Dice']= (dice_water + dice_rock + dice_glacier) / 3
-        scores['Weighted-Dice'] = (gt_water.sum() * dice_water + gt_rock.sum() * dice_rock + gt_glacier.sum() * dice_glacier) / (gt_img.shape[0] * gt_img.shape[1])
-        scores['Euclidian'] = distance.euclidean(gt_img.flatten(), pred_img.flatten())
+        scores['image'] = img_name
+        scores['dice-water']=  dice_water
+        scores['dice-rock']=  dice_rock
+        scores['dice-glacier']= dice_glacier
+        scores['dice']= (dice_water + dice_rock + dice_glacier) / 3
+        scores['euclidian'] = distance.euclidean(gt_img.flatten(), pred_img.flatten())
         scores['IOU'] = metrics.IOU(gt_img.flatten(), pred_img.flatten())
         #scores['specificity'] = metrics.specificity(gt_flat, pred_flat)
         #scores['sensitivity'] = recall_score(gt_flat, pred_flat)
@@ -84,7 +99,15 @@ def eval_img_multiclass(gt_file, pred_file, img_name, uncertainty_file=None):
     return scores
 
 
-def evaluate(gt_path, pred_path, gt_front_path=None, out_path=None, multi_class=False):
+def evaluate(gt_path, pred_path, out_path=None, multi_class=False):
+    """
+    Evaluate the prediction masks using the Ground-truth
+    :param gt_path:  path to the ground segmentation masks
+    :param pred_path:  path to the predicted segmentation masks
+    :param out_path: Where to write the Results to
+    :param multi_class: If multiclass classification is used (not giving correct results!)
+    :return: pandas Dataframe containing the results for each image
+    """
     pred_path = Path(pred_path)
     gt_path = Path(gt_path)
     if not out_path:
@@ -116,7 +139,7 @@ def evaluate(gt_path, pred_path, gt_front_path=None, out_path=None, multi_class=
     if len(uncertainty_files) != 0 and len(uncertainty_files) != len(pred_files):
         raise AssertionError("Nr of Uncertainty images does not match Nr of Prediction images")
 
-
+    # Evaluate each gt, prediction pair using multiprocessing
     p = Pool()
     if len(uncertainty_files) > 0:
         set = zip(gt_files, pred_files, img_names, uncertainty_files)
@@ -128,20 +151,18 @@ def evaluate(gt_path, pred_path, gt_front_path=None, out_path=None, multi_class=
         scores = p.starmap(eval_img, set)
 
     scores = pd.DataFrame(scores)
-
     scores.to_pickle(Path(out_path, 'scores.pkl'))
 
     # Create summary report
     if multi_class:
-        header ='Macro-Dice\tWeighted-Dice\tDice-Water\tDice-Rock\tDice-Glacier\tIOU\tEucl'
+        header ='Average Dice\tDice-Water\tDice-Rock\tDice-Glacier\tIOU\tEucl'
         report = (
-                  str(np.mean(scores['Macro-Dice'])) + '\t'
-                  + str(np.mean(scores['Weighted-Dice'])) + '\t'
-                + str(np.mean(scores['Dice-Water'])) + '\t'
-                  + str(np.mean(scores['Dice-Rock'])) + '\t'
-                  + str(np.mean(scores['Dice-Glacier'])) + '\t'
+                  str(np.mean(scores['dice'])) + '\t'
+                + str(np.mean(scores['dice-water'])) + '\t'
+                  + str(np.mean(scores['dice-rock'])) + '\t'
+                  + str(np.mean(scores['dice-glacier'])) + '\t'
                   + str(np.mean(scores['IOU']))+ '\t'
-                  + str(np.mean(scores['Euclidian'])) )
+                  + str(np.mean(scores['euclidian'])) )
     else:
         header ='Dice\tIOU\tEucl\tSensitivity\tSpecificitiy'
         report = (str(np.mean(scores['dice'])) + '\t'
@@ -149,10 +170,6 @@ def evaluate(gt_path, pred_path, gt_front_path=None, out_path=None, multi_class=
                 + str(np.mean(scores['euclidian'])) + '\t'
                 + str(np.mean(scores['sensitivity'])) + '\t'
                 + str(np.mean(scores['specificity'])))
-    if 'line_accuracy' in scores:
-        header += "\tline_accuracy"
-        report += '\t' + str(np.mean(scores['line_accuracy']))
-
     report += '\n'
 
 
@@ -166,116 +183,15 @@ def evaluate(gt_path, pred_path, gt_front_path=None, out_path=None, multi_class=
     return scores
 
 
-
-#def eval(gt_file, pred_file,img_name, uncertainty_file=None):
-#    gt_img = tf.image.decode_png(gt_file)
-#    gt = tf.cast(gt_img > 200, tf.float32)
-#    pred_img = tf.image.decode_png(pred_file)
-#    pred = tf.cast(pred_img > 200,tf.float32)
-#    pred_flat = tf.reshape(pred, [-1])
-#    gt_flat = tf.reshape(gt, [-1])
-#    scores = {}
-#    scores['image'] = img_name
-#    scores['dice']= metrics.dice_coefficient_tf(gt_flat, pred_flat)
-#    scores['euclidian'] = metrics.euclidian_tf(gt_flat, pred_flat)
-#    scores['IOU'] = metrics.IOU_tf(gt_flat, pred_flat)
-#    scores['specificity'] = metrics.specificity_tf(gt_flat, pred_flat)
-#    if uncertainty_file:
-#        uncertainty_img =  tf.image.decode_png(uncertainty_file)
-#        uncertainty = uncertainty_img / 65535
-#    else:
-#        uncertainty = 0.
-#    scores['uncertainty'] = tf.reduce_mean(uncertainty)
-#    m = tf.metrics.Recall()
-#    m.update_state(gt_flat, pred_flat)
-#    scores['sensitivity'] = m.result()
-#    return scores
-#
-#def evaluate_tf(gt_path, pred_path, batch_size=4):
-#    pred_path = Path(pred_path)
-#    gt_path = Path(gt_path)
-#
-#    pred_files =[]
-#    gt_files = []
-#    img_names = []
-#    uncertainty_files = []
-#    for f in gt_path.glob("*.png"):
-#        gt_files.append(str(f))
-#        if "_zones.png" in f.name:
-#            basename = f[:f.name.rfind('_')]
-#        else:
-#            basename = f.stem
-#        img_names.append(basename + '.png')
-#        if Path(pred_path, basename + "_pred.png").exists():
-#            pred_files.append(str(Path(pred_path, basename + '_pred.png')))
-#        elif Path(pred_path, basename + ".png").exists():
-#            pred_files.append(str(Path(pred_path, basename + '.png')))
-#        else:
-#            raise FileNotFoundError(str(Path(pred_path, basename + '.png')) + " not found")
-#        if Path(pred_path, basename + "_uncertainty.png").exists():
-#            uncertainty_files.append(str(Path(pred_path, basename + '_uncertainty.png')))
-#
-#
-#    if len(pred_files) != len(gt_files) != len(img_names):
-#        raise AssertionError("Prediction and Ground truth set size does not match")
-#
-#    if len(uncertainty_files) != 0 and len(uncertainty_files) != len(pred_files):
-#        raise AssertionError("Nr of Uncertainty images does not match Nr of Prediction images")
-#
-#    pred_set = tf.data.Dataset.from_tensor_slices(pred_files)
-#    gt_set = tf.data.Dataset.from_tensor_slices(gt_files)
-#    name_set = tf.data.Dataset.from_tensor_slices(img_names)
-#    uncertainty_set = tf.data.Dataset.from_tensor_slices(uncertainty_files)
-#
-#    if len(uncertainty_files) > 0:
-#        set = tf.data.Dataset.zip((gt_set, pred_set,name_set, uncertainty_set))
-#    else:
-#        set = tf.data.Dataset.zip((gt_set, pred_set,name_set))
-#
-#    scores = set.map(eval)
-#    scores_list = scores.reduce([], lambda l, e: l.append(e))
-#    scores = pd.DataFrame(scores_list)
-#
-#
-#    print("BLA")
-
-
-
-
-
-#def evaluate_dice_only(imgs, gt_imgs, predictions):
-#    dice = []
-#    for img, gt_img, pred in zip(imgs, gt_imgs, predictions):
-#        gt = (gt_img > 200).astype(int)
-#        gt_flat = gt.flatten()
-#        pred_flat = pred.flatten()
-#        dice.append(metrics.dice_coefficient(gt_flat, pred_flat))
-#    return dice
-
-
-#def evaluate_dice_only_(img_path, gt_path, prediction_path):
-#    dice = []
-#    for filename in Path(img_path).rglob('*.png'):
-#        gt_img = io.imread(Path(gt_path, filename.stem + '_zones.png'), as_gray=True)
-#        if (Path(prediction_path, filename.stem + '_pred.png')).exists():
-#            pred_img = io.imread(Path(prediction_path, filename.stem + '_pred.png'), as_gray=True)
-#        elif Path(prediction_path,filename.name).exists():
-#            pred_img = io.imread(Path(prediction_path,filename.name), as_gray=True) # Legacy before predictions got pred indentifier
-#        else:
-#            print(str(Path(prediction_path,filename.name)) + " not found")
-#            continue
-#
-#
-#        gt = (gt_img > 200).astype(int)
-#        pred = (pred_img > 200).astype(int)
-#
-#        gt_flat = gt.flatten()
-#        pred_flat = pred.flatten()
-#        print(filename.name)
-#        dice.append(metrics.dice_coefficient(gt_flat, pred_flat))
-#    return dice
-
 def plot_history(history, out_file, xlim=None, ylim=None, title=None):
+    """
+    Creates plot of the training loss history
+    :param history: keras model history
+    :param out_file: output plot image file
+    :param xlim: x-axis limits
+    :param ylim: y-axis limits
+    :param title: plot title
+    """
     plt.figure()
     plt.rcParams.update({'font.size': 18})
     plt.plot( history['loss'], 'X-', label='training loss', linewidth=4.0)
@@ -294,21 +210,15 @@ def plot_history(history, out_file, xlim=None, ylim=None, title=None):
     plt.savefig(out_file, bbox_inches='tight', format='png', dpi=200)
     plt.show()
 
-def eval_uncertainty(file, out_file, vmin=0, vmax=0.2):
-    uncertainty = np.load(file)
-    plt.figure()
-    sns.heatmap(uncertainty, vmin=vmin, vmax=vmax, xticklabels=False, yticklabels=False)
-    plt.savefig(out_file, bbox_inches='tight', format='png', dpi=200)
-
 if __name__ == '__main__':
-    path = Path('../output/output_front1_zhang_2')
+    path = Path('/home/andreas/glacier-front-detection/output/multiclass/front1_zangh_multiclass')
 
     test_path = Path('../datasets/front_detection_dataset/test/')
-    evaluate(Path(test_path, 'masks'), path)
+    evaluate(Path(test_path, 'masks'), path, multi_class=True)
     #test_path = Path('/home/andreas/glacier-front-detection/datasets/Jakobshavn_front_only/test')
     #history = pickle.load(open(next(path.glob('history*.pkl')), 'rb'))
-    #history = pd.read_csv(Path(path,'model_1_history.csv'))
-    #plot_history(history, Path(path, 'loss_plot.png') , xlim=(-10,30), ylim=(0,0.75), title='Set1')
+    #history = pd.read_csv(Path(path,'masks_predicted_unet_Enze19_2_binary_crossentropy_monitor_val_loss/history.csv'))
+    #plot_history(history, Path(path, 'loss_plot.png') , title='Set1')
 
     #evaluate(Path(test_path,'images'), Path(test_path,'masks'), path)
 

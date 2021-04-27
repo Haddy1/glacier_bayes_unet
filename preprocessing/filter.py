@@ -29,6 +29,12 @@ def enhanced_lee(img, window_size=7, looks=2, damp_factor=1, eps=10e-6):
 
 
 def get_denoise_filter(denoise, denoise_parameters=None):
+    """
+    Return preconfigured Denoise Filter function with only image as input
+    :param denoise: Name of the filter
+    :param denoise_parameters: Filter parameters
+    :return: filter_func(img)
+    """
     denoise = denoise.lower()
     if denoise == 'bilateral':
         if denoise_parameters:

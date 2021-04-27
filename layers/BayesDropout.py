@@ -2,7 +2,7 @@
 from tensorflow.keras.layers import Layer, Dropout
 from tensorflow.python.ops import nn
 
-
+# Modified Dropout Layer for Bayesian U-Net: also applied during testing phase
 class BayesDropout(Dropout):
 
   def __init__(self, rate, noise_shape=None, seed=None, **kwargs):

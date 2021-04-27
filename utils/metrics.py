@@ -7,11 +7,6 @@ import matplotlib
 import tensorflow as tf
 from scipy.spatial.distance import cdist
 
-def dice_coefficient_cutoff(gt, pred, cutoff):
-    pred_bin = (pred >= cutoff).astype(int)
-    return dice_coefficient(gt, pred_bin)
-
-
 def dice_coefficient(u,v):
     """
     For binary vectors the Dice cooefficient can be written as
@@ -32,36 +27,41 @@ def dice_coefficient(u,v):
         c_v = np.sum(v**2)
     return 2 * c_uv / (c_u + c_v)
 
+def dice_coefficient_cutoff(gt, pred, cutoff):
+    """
+    Binarizes pred using cutoff as threshold
+    and computes dice coefficent for boolean vectors
+    Used for threshold optimization
+
+    :param gt:  binary vector
+    :param pred:  vector
+    :param cutoff: cutoff threshold in same range as pred
+    :return dice coefficient
+    """
+    pred_bin = (pred >= cutoff).astype(int)
+    return dice_coefficient(gt, pred_bin)
 
 def IOU(y_true, y_pred):
+    """
+        Returns Intersection over Union (IOU)
+    :param y_true:  binary vector of ground truth
+    :param y_pred:  binary vector prediction, same length as u
+    :return:   IOU
+    """
 
     intersection = np.sum(y_true * y_pred)
-    union = y_true.size
+    union = np.sum(y_true.astype(np.bool) | y_pred.astype(np.bool))
     return intersection / union
 
 
-def dice_coefficient_tf(u,v):
-    """
-    For binary vectors the Dice cooefficient can be written as
-    2 * |u * v| / (|u**2| + |v**2|)
-
-    | u * v | gives intersecting set
-    |u**2|, |v**2| number of (true) elements in set
-
-    :param u:  binary vector
-    :param v:  binary vector of same length as u
-    :return:   dice coefficient
-    """
-    c_uv = tf.reduce_sum(u*v)
-    if c_uv == 0:
-        return 0.
-    else:
-        c_u = tf.reduce_sum(u**2)
-        c_v = tf.reduce_sum(v**2)
-    return 2 * c_uv / (c_u + c_v)
-
-
 def specificity(y_true, y_pred):
+    """
+        Returns specificity
+
+    :param y_true:  binary vector of ground truth
+    :param y_pred:  binary vector of prediction, same length as u
+    :return:   specificity value
+    """
     neg_y_true = 1 - y_true
     neg_y_pred = 1 - y_pred
     fp = np.sum(neg_y_true * y_pred)
@@ -69,25 +69,12 @@ def specificity(y_true, y_pred):
     result = tn / (tn + fp + K.epsilon())
     return result
 
-
-def specificity_tf(y_true, y_pred):
-    neg_y_true = 1 - y_true
-    neg_y_pred = 1 - y_pred
-    fp = tf.reduce_sum(neg_y_true * y_pred)
-    tn = tf.reduce_sum(neg_y_true * neg_y_pred)
-    result = tn / (tn + fp + K.epsilon())
-    return result
-
-
-
-
-def IOU_tf(y_true, y_pred):
-    intersection = tf.reduce_sum(y_true * y_pred)
-    union = tf.cast(tf.size(y_true), tf.float32)
-    return intersection / union
-
-
 def euclidian_tf(y_true, y_pred):
+    """
+    :param y_true:  binary vector of ground truth
+    :param y_pred:  binary vector of prediction, same length as u
+    :return:   euclidian distance between y_true and y_pred
+    """
     return tf.reduce_sum((y_true - y_pred)**2)
 
 def line_graph(y_true, y_pred):
