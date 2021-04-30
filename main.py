@@ -1,28 +1,17 @@
 import argparse
 import time
 from pathlib import Path
-import pickle
 import json
-import datetime
 
-import cv2
-import matplotlib.pyplot as plt
-import numpy as np
-import tensorflow.keras as keras
 from tensorflow.keras.models import load_model
-import os
 from layers.BayesDropout import  BayesDropout
-import pandas as pd
 
-from utils.data import trainGenerator, imgGenerator
-import models
 from utils import helper_functions
 from loss_functions import *
 from tensorflow.keras.losses import *
-from shutil import copy, rmtree
 from preprocessing.preprocessor import Preprocessor
-from preprocessing import data_generator, filter
-from predict import predict, get_cutoff_point
+from preprocessing import filter
+from predict import predict
 from utils import  evaluate
 from train import train
 

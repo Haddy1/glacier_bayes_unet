@@ -1,9 +1,5 @@
 import numpy as np
-import argparse
 import tensorflow.keras.backend as K
-import subprocess as sp
-from pathlib import Path
-import matplotlib
 import tensorflow as tf
 from scipy.spatial.distance import cdist
 

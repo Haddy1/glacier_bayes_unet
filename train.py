@@ -1,5 +1,3 @@
-import csv
-
 import numpy as np
 from pathlib import Path
 from preprocessing import data_generator
@@ -19,7 +17,7 @@ import os
 from utils.helper_functions import check_data_path
 from predict import get_cutoff_point
 from utils.callbacks import CustomEarlyStopping
-from utils.data import imgGenerator
+
 def train(model_name, train_path, val_path, out_path, args, train_uncert_path=None, val_uncert_path=None, loss_function=binary_crossentropy, preprocessor=None, second_stage=False):
     """
     Trains a keras model for Segmentation

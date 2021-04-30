@@ -1,6 +1,5 @@
 import json
 from tensorflow.keras.models import load_model
-from utils.data import *
 import argparse
 from loss_functions import *
 from tensorflow.keras.losses import binary_crossentropy
@@ -13,13 +12,10 @@ import cv2
 from utils.metrics import dice_coefficient_cutoff
 from utils.evaluate import evaluate#, evaluate_dice_only
 from preprocessing.image_patches import extract_grayscale_patches, reconstruct_from_grayscale_patches
-from preprocessing.data_generator import process_imgs
-from utils.helper_functions import nat_sort
 import matplotlib.pyplot as plt
-import pandas as pd
 from multiprocessing import Pool
 from functools import partial
-from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
+from pathlib import Path
 
 def predict(model, img_path, out_path, uncert_path=None, uncert_threshold=None, batch_size=16, patch_size=256, cutoff=0.5, preprocessor=None, mc_iterations = 20):
     """
