@@ -237,7 +237,7 @@ def get_cutoff_point(model, val_path, uncert_path=None, out_path=None, batch_siz
         #plt.xlabel('Cutoff Point')
         #plt.savefig(str(Path(out_path, 'cutoff.png')), bbox_inches='tight', format='png', dpi=200)
 
-        plt.rcParams.update({'font.size': 23})
+        plt.rcParams.update({'font.size': 18})
         fig, ax = plt.subplots()
         ax.set_ylim(0,1.00)
         ax.plot((cutoff_pt), (-0.02), ls="", marker="|", ms=10, color="k",
@@ -248,9 +248,6 @@ def get_cutoff_point(model, val_path, uncert_path=None, out_path=None, batch_siz
         ax.annotate(f'{cutoff_pt:.2f}', (cutoff_pt, 0.02), color='red')#, fontsize='x-small')
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
-        #plt.xticks(cutoff_pts['cutoff_pts'])
-        #ax.xaxis.grid(True, which='minor')
-        ax.xaxis.set_minor_locator(MultipleLocator(0.025))
         plt.ylabel('Dice')
         plt.xlabel('Decision Threshold')
         plt.savefig(str(Path(out_path, 'cutoff.png')), bbox_inches='tight', format='png', dpi=200)
@@ -345,7 +342,7 @@ if __name__ == '__main__':
     parser.add_argument('--gt_path', type=str, help='Path containing the ground truth, necessary for evaluation_scripts')
     parser.add_argument('--batch_size', default=1, type=int, help='batch size (integer value)')
     parser.add_argument('--cutoff', type=float, help='cutoff point of binarisation')
-    parser.add_argument('--patches_only', action='store_true')
+    parser.add_argument('--patches_only', action='store_true', help='optimized prediction algorithm for small image patches')
     args = parser.parse_args()
 
     if not Path(args.model_path).exists():

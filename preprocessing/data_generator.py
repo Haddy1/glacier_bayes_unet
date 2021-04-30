@@ -1,3 +1,4 @@
+import argparse
 from os.path import join, realpath, dirname
 import sys
 path = realpath(__file__)
@@ -5,12 +6,12 @@ sys.path.append(join(dirname(path), "../"))
 from pathlib import Path
 import numpy as np
 import cv2
-from skimage import io
 from preprocessing import image_patches, preprocessor,augmentation
 import json
 import random
+import pandas as pd
+import string
 from shutil import copy, rmtree
-from multiprocessing import Pool
 
 def process_imgs(in_dir, out_dir, patch_size=256, preprocessor = None, augment = None, border='zeros'):
     """
@@ -90,7 +91,7 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, augment =
     :param border: boundary rule: zeros or crop (default: zeros)
     :param combine: combine image and segmentation into single image
     :param uncert_minmax: Do minmax normalization on uncertainty masks
-    :return:
+    :return: dictionary containing images and their patch numbers
     """
 
     if not Path(out_dir).exists():
@@ -99,8 +100,8 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, augment =
     if not combine:
         if not Path(out_dir, 'images').exists():
             Path(out_dir, 'images').mkdir()
-        if not Path(out_dir, 'masks_zones').exists():
-            Path(out_dir, 'masks_zones').mkdir()
+        if not Path(out_dir, 'masks').exists():
+            Path(out_dir, 'masks').mkdir()
 
     if Path(in_dir, 'uncertainty').exists() and not Path(out_dir, 'uncertainty').exists():
         Path(out_dir, 'uncertainty').mkdir()
@@ -119,16 +120,16 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, augment =
         if preprocessor is not None:
             img = preprocessor.process(img)
 
-        if Path(in_dir, 'masks_zones', basename + '_zones.png').exists():
-            mask_zones = cv2.imread(str(Path(in_dir, 'masks_zones', basename + '_zones.png')), cv2.IMREAD_GRAYSCALE)
+        if Path(in_dir, 'masks', basename + '_zones.png').exists():
+            mask_zones = cv2.imread(str(Path(in_dir, 'masks', basename + '_zones.png')), cv2.IMREAD_GRAYSCALE)
         else:
-            mask_zones = cv2.imread(str(Path(in_dir, 'masks_zones', basename + '.png')), cv2.IMREAD_GRAYSCALE)
+            mask_zones = cv2.imread(str(Path(in_dir, 'masks', basename + '.png')), cv2.IMREAD_GRAYSCALE)
 
         if Path(in_dir, 'lines').exists():
             if Path(in_dir, 'lines', basename + '_front.png').exists():
-                front = cv2.imread(str(Path(in_dir, 'masks_lines', basename + '_front.png')), cv2.IMREAD_GRAYSCALE)
+                front = cv2.imread(str(Path(in_dir, 'lines', basename + '_front.png')), cv2.IMREAD_GRAYSCALE)
             else:
-                front = cv2.imread(str(Path(in_dir, 'masks_lines', basename + '.png')), cv2.IMREAD_GRAYSCALE)
+                front = cv2.imread(str(Path(in_dir, 'lines', basename + '.png')), cv2.IMREAD_GRAYSCALE)
 
         if Path(in_dir, 'uncertainty').exists():
             if Path(in_dir, 'uncertainty', basename + '_uncertainty.png').exists():
@@ -150,7 +151,7 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, augment =
                 uncertainty = cv2.copyMakeBorder(uncertainty, 0, (patch_size - uncertainty.shape[0]) % patch_size, 0, (patch_size - uncertainty.shape[1]) % patch_size, cv2.BORDER_CONSTANT)
         if border == 'crop':
             img = img[:img.shape[0] // patch_size, :img.shape[1] // patch_size]
-            mask_zones = masks_zones[:img.shape[0] // patch_size, :img.shape[1] // patch_size]
+            mask_zones = mask_zones[:img.shape[0] // patch_size, :img.shape[1] // patch_size]
             if uncertainty is not None:
                 uncertainty= uncertainty[:img.shape[0] // patch_size, :img.shape[1] // patch_size]
             front = front[:img.shape[0] // patch_size, :img.shape[1] // patch_size]
@@ -198,8 +199,8 @@ def process_data(in_dir, out_dir, patch_size=256, preprocessor = None, augment =
                         cv2.imwrite(str(Path(out_dir, str(patch_counter)+'.png')), combined)
                     else:
                         cv2.imwrite(str(Path(out_dir, 'images/'+str(patch_counter)+'.png')), p_img[j])
-                        cv2.imwrite(str(Path(out_dir, 'masks_zones/'+str(patch_counter)+'.png')), p_mask_zones[j])
-                    cv2.imwrite(str(Path(out_dir, 'masks_lines/'+str(patch_counter)+'.png')), p_front[j])
+                        cv2.imwrite(str(Path(out_dir, 'masks/'+str(patch_counter)+'.png')), p_mask_zones[j])
+                    cv2.imwrite(str(Path(out_dir, 'lines/'+str(patch_counter)+'.png')), p_front[j])
                     if uncertainty is not None:
                         cv2.imwrite(str(Path(out_dir, 'uncertainty/'+str(patch_counter)+'.png')), p_uncert[j])
 
@@ -354,7 +355,37 @@ def split_set(data_dir, out_dir1, out_dir2, split):
 
 
 if __name__ == "__main__":
-    random.seed(1)
-    patch_size = 256
+    parser = argparse.ArgumentParser(description='Dataset Generator')
+    parser.add_argument('--out_path', type=str, help='output path for dataset')
+    parser.add_argument('--csv_file', type=str, help='Csv file containing img paths for dataset')
+    parser.add_argument('--patch_size', type=int, default=256, help='Size of generated image patches')
+    parser.add_argument("--seed", type=int, default=1, help="Seed for random number generator")
 
+    args = parser.parse_args()
+    random.seed(args.seed)
+    out_path = Path(args.out_path)
+    set = pd.read_csv(args.csv_file, usecols=['images', 'masks', 'lines'])
+    if out_path.exists():
+        rmtree(out_path)
+    Path(out_path,'images').mkdir(parents=True)
+    Path(out_path,'lines').mkdir(parents=True)
+    Path(out_path,'masks').mkdir(parents=True)
+    for index, row in set.iterrows():
+        img = Path(row['images'])
+        line = Path(row['lines'])
+        mask = Path(row['masks'])
 
+        img_out = Path(out_path, 'images', img.name)
+        line_out = Path(out_path, 'lines', line.name)
+        mask_out = Path(out_path, 'masks', mask.name)
+        c = 0
+        while (img_out.exists()):
+            img_out = Path(out_path, 'images', img.stem + '_' + string.ascii_lowercase[c] + '.png')
+            line_out = Path(out_path, 'lines', img.stem + '_' + string.ascii_lowercase[c] + '_front.png')
+            mask_out = Path(out_path, 'masks', img.stem + '_' + string.ascii_lowercase[c] + '_zones.png')
+            c += 1
+        copy(img, img_out)
+        copy(line, line_out)
+        copy(mask, mask_out)
+
+    process_data(out_path, Path(out_path, 'patches'), patch_size=args.patch_size)

@@ -12,7 +12,6 @@ from tensorflow.keras.models import load_model
 import tensorflow.keras as keras
 from layers.BayesDropout import  BayesDropout
 import json
-import pickle
 import models
 import pandas as pd
 import errno
@@ -57,7 +56,7 @@ def train(model_name, train_path, val_path, out_path, args, train_uncert_path=No
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), str(train_uncert_path) + " is empty")
         if not Path(train_uncert_path, 'patches').exists():
             data_generator.process_imgs(Path(train_uncert_path), Path(train_uncert_path, 'patches'))
-        train_uncert_path_patches = Path(train_uncert_path), Path(train_uncert_path, 'patches')
+        train_uncert_path_patches = Path(train_uncert_path, 'patches')
     val_uncert_path_patches = None
     if val_uncert_path is not None:
         if not Path(val_uncert_path).exists():
@@ -66,7 +65,7 @@ def train(model_name, train_path, val_path, out_path, args, train_uncert_path=No
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), str(val_uncert_path) + " is empty")
         if not Path(val_uncert_path, 'patches').exists():
             data_generator.process_imgs(Path(val_uncert_path), Path(val_uncert_path, 'patches'))
-        val_uncert_path_patches = Path(val_uncert_path), Path(val_uncert_path, 'patches')
+        val_uncert_path_patches = Path(val_uncert_path, 'patches')
 
     if not Path(out_path).exists():
         Path(out_path).mkdir(parents=True)
@@ -201,7 +200,6 @@ def train(model_name, train_path, val_path, out_path, args, train_uncert_path=No
     plt.minorticks_on()
     plt.grid(which='minor', linestyle='--')
     plt.savefig(str(Path(str(out_path), 'loss_plot.png')), bbox_inches='tight', format='png', dpi=200)
-    plt.show()
 
     # Cleanup
     if Path(out_path, 'model_' + model_name + '.h5').exists(): # Only cleanup if finished training model exists
